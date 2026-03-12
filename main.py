@@ -246,3 +246,9 @@ async def atualizar_configuracoes(config: Configuracoes):
         return {"status": "sucesso"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/obter-api-key", dependencies=[Depends(verificar_admin)])
+async def obter_api_key():
+    """Devolve a chave da API-Football salva no Railway para o painel Admin"""
+    return {"api_key": FOOTBALL_API_KEY}
