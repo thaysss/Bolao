@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import Dict
 from datetime import datetime
+from fastapi.responses import FileResponse
 import httpx
 import os
 from supabase import create_client, Client
@@ -69,7 +70,11 @@ def verificar_admin(x_admin_token: str = Header(...)):
         raise HTTPException(status_code=401, detail="Crachá inválido! Acesso negado.")
     
 # ---------------- ENDPOINTS (ROTAS DA API) ----------------
-
+@app.get("/")
+async def pagina_inicial():
+    """Quando alguém acessar o link do Railway, o Python entrega o site visual"""
+    return FileResponse("index.html")
+    
 @app.get("/jogos-hoje")
 async def buscar_jogos(data: str = None):
     """Busca jogos na API de Futebol e retorna ao frontend (Veio do seu banco.py)"""
