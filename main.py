@@ -91,6 +91,21 @@ async def listar_jogos():
     res = supabase.table("jogos").select("*").order("datetime").execute()
     return res.data
 
+@app.get("/jogos-hoje")
+async def buscar_jogos_api(data: str = None):
+    """Busca jogos na API-Football para o Admin escolher"""
+    if not data:
+        data = datetime.now().strftime("%Y-%m-%d")
+        
+    url = f"https://v3.football.api-sports.io/fixtures?date={data}&timezone=America/Sao_Paulo"
+    headers = {"x-apisports-key": FOOTBALL_API_KEY}
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url, headers=headers)
+            return response.json()
+        except Exception as e:
+            return {"error": str(e)}
 @app.post("/salvar-aposta")
 async def salvar_aposta(aposta: Aposta):
     try:
