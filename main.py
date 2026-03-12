@@ -6,6 +6,7 @@ import httpx
 import os
 from supabase import create_client, Client
 from fastapi_utils.tasks import repeat_every
+import asyncio
 
 app = FastAPI()
 
@@ -107,40 +108,53 @@ async def obter_ranking_geral():
 
 # ---------------- TAREFAS EM SEGUNDO PLANO ----------------
 
-@app.on_event("startup")
-@repeat_every(seconds=60 * 60)  # Roda a cada 1 hora automaticamente
-async def sincronizar_resultados_automatico():
-    """Atualiza placares automaticamente buscando na API-Football"""
-    jogos_pendentes = supabase.table("jogos").select("id, apiId").filter("result", "is", "null").execute().data
-    
-    if not jogos_pendentes:
-        return 
+import asyncio # Adicione isso lá no topo do main.py junto com os outros imports
 
-    async with httpx.AsyncClient() as client:
-        headers = {"x-apisports-key": FOOTBALL_API_KEY}
-        
-        for jogo in jogos_pendentes:
-            api_id = jogo.get("apiId")
-            if not api_id:
-                continue
-                
-            try:
-                response = await client.get(f"https://v3.football.api-sports.io/fixtures?id={api_id}", headers=headers)
-                dados = response.json()
-                
-                if dados.get("response"):
-                    fixture = dados["response"][0]
-                    status = fixture["fixture"]["status"]["short"]
+# ---------------- TAREFAS EM SEGUNDO PLANO (ATUALIZADO) ----------------
+
+@app.on_event("startup")
+async def iniciar_automacoes():
+    """Esta função roda assim que o servidor liga no Railway"""
+    # Dispara a função de sincronização para rodar no fundo
+    asyncio.create_task(sincronizar_resultados_automatico())
+
+async def sincronizar_resultados_automatico():
+    """Loop infinito que atualiza os placares e dorme por 1 hora"""
+    while True:
+        try:
+            jogos_pendentes = supabase.table("jogos").select("id, apiId").filter("result", "is", "null").execute().data
+            
+            if jogos_pendentes:
+                async with httpx.AsyncClient() as client:
+                    headers = {"x-apisports-key": FOOTBALL_API_KEY}
                     
-                    if status in ["FT", "AET", "PEN"]:
-                        gols_casa = fixture["goals"]["home"]
-                        gols_fora = fixture["goals"]["away"]
+                    for jogo in jogos_pendentes:
+                        api_id = jogo.get("apiId")
+                        if not api_id:
+                            continue
+                            
+                        # Busca o resultado na API
+                        response = await client.get(f"https://v3.football.api-sports.io/fixtures?id={api_id}", headers=headers)
+                        dados = response.json()
                         
-                        supabase.table("jogos").update({
-                            "result": {"home": str(gols_casa), "away": str(gols_fora)}
-                        }).eq("id", jogo["id"]).execute()
-            except Exception as e:
-                print(f"Erro ao atualizar jogo {api_id}: {e}")
+                        if dados.get("response"):
+                            fixture = dados["response"][0]
+                            status = fixture["fixture"]["status"]["short"]
+                            
+                            if status in ["FT", "AET", "PEN"]:
+                                gols_casa = fixture["goals"]["home"]
+                                gols_fora = fixture["goals"]["away"]
+                                
+                                supabase.table("jogos").update({
+                                    "result": {"home": str(gols_casa), "away": str(gols_fora)}
+                                }).eq("id", jogo["id"]).execute()
+                                
+            print("Sincronização de resultados finalizada com sucesso.")
+        except Exception as e:
+            print(f"Erro na sincronização: {e}")
+        
+        # O servidor 'dorme' nessa tarefa por 1 hora (3600 segundos) antes de repetir
+        await asyncio.sleep(3600)
 
 
 
