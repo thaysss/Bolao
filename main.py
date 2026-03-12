@@ -221,3 +221,14 @@ async def aprovar_pagamento(aposta_id: str, status: bool):
         return {"status": "sucesso"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/admin/zerar-apostas", dependencies=[Depends(verificar_admin)])
+async def zerar_apostas():
+    """Remove TODAS as apostas do banco de dados para iniciar um novo ciclo"""
+    try:
+        # Comando para deletar todas as linhas da tabela 'apostas'
+        supabase.table("apostas").delete().neq("nome", "FORCAR_DELETE_TOTAL").execute()
+        return {"status": "sucesso"}
+    except Exception as e:
+        print(f"Erro ao zerar: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
