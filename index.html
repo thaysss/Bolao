@@ -659,6 +659,7 @@ function renderAdmin() {
   refreshApiStatus();
   renderAdminGames();
   renderAdminResults();
+  carregarApostasAdmin();
   document.getElementById('fetch-panel').style.display = S.apiKey ? 'block' : 'none';
 }
 
@@ -924,6 +925,44 @@ function toast(msg, isErr=false) {
   t.textContent=msg; t.className='toast'+(isErr?' err':'');
   void t.offsetWidth; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+async function carregarApostasAdmin() {
+  const response = await fetch(`${BACKEND_URL}/admin/apostas`, {
+    headers: { 'x-admin-token': adminToken }
+  });
+  const apostas = await response.json();
+  const el = document.getElementById('admin-bets-list');
+  
+  if (!apostas.length) {
+    el.innerHTML = '<p style="color:var(--muted);padding:1rem">Nenhuma aposta feita ainda.</p>';
+    return;
+  }
+
+  el.innerHTML = apostas.map(a => `
+    <div class="rank-item" style="margin-bottom:.5rem; grid-template-columns: 1fr auto auto;">
+      <div>
+        <div class="rank-name">${a.nome}</div>
+        <div class="rank-hits" style="font-size:.7rem">${a.whatsapp}</div>
+      </div>
+      <div style="text-align:right">
+        <button class="toggle-btn ${a.pago ? 'on' : ''}" onclick="togglePagamento('${a.id}', ${!a.pago})">
+          ${a.pago ? '✅ PAGO' : '⏳ PENDENTE'}
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function togglePagamento(id, novoStatus) {
+  try {
+    await fetch(`${BACKEND_URL}/admin/aprovar-pagamento/${id}?status=${novoStatus}`, {
+      method: 'PUT',
+      headers: { 'x-admin-token': adminToken }
+    });
+    toast(novoStatus ? 'Pagamento aprovado!' : 'Aposta pendente');
+    carregarApostasAdmin();
+  } catch (e) { toast('Erro ao atualizar', true); }
 }
 
 // auto-refresh

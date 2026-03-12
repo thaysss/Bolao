@@ -55,6 +55,47 @@ def verificar_admin(x_admin_token: str = Header(None)):
     if x_admin_token != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Acesso negado.")
 
+
+def calcular_ranking(jogos_oficiais, todas_apostas):
+    ranking = []
+    
+    for aposta in todas_apostas:
+        pontos = 0
+        palpites = aposta.get("palpites", {})
+        
+        for jogo in jogos_oficiais:
+            jogo_id = str(jogo["id"])
+            resultado_real = jogo.get("result") # Ex: {"home": "2", "away": "1"}
+            
+            # Pula o jogo se ele ainda não tiver resultado oficial
+            if not resultado_real or resultado_real.get("home") is None or resultado_real.get("home") == "":
+                continue
+            
+            try:
+                # 1. Descobre quem ganhou na vida real
+                gols_h = int(resultado_real["home"])
+                gols_a = int(resultado_real["away"])
+                vencedor_real = "home" if gols_h > gols_a else "away" if gols_a > gols_h else "draw"
+                
+                # 2. Compara com o palpite do usuário para esse jogo específico
+                meu_palpite = palpites.get(jogo_id)
+                
+                if meu_palpite == vencedor_real:
+                    pontos += 1
+            except Exception as e:
+                print(f"Erro ao processar pontos do jogo {jogo_id}: {e}")
+                continue
+        
+        # Adiciona o resumo desse apostador na lista
+        ranking.append({
+            "nome": aposta.get("nome", "Anônimo"),
+            "pontos": pontos,
+            "whatsapp": aposta.get("whatsapp", "")
+        })
+    
+    # Ordena: quem tem mais pontos fica no topo (🥇)
+    return sorted(ranking, key=lambda x: x["pontos"], reverse=True)
+
 # ---------------- ROTAS DO SITE ----------------
 
 @app.get("/")
@@ -86,24 +127,24 @@ async def salvar_aposta(aposta: Aposta):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/ranking-geral")
-async def ranking():
-    # Lógica simplificada de ranking (calculada na hora)
-    jogos = supabase.table("jogos").select("*").execute().data
-    apostas = supabase.table("apostas").select("*").execute().data
-    resultado = []
-    for a in apostas:
-        pts = 0
-        palpites = a.get("palpites", {})
-        for j in jogos:
-            j_id = str(j["id"])
-            res = j.get("result")
-            if res and res.get("home") is not None:
-                h, v = int(res["home"]), int(res["away"])
-                venc = "home" if h > v else "away" if v > h else "draw"
-                if palpites.get(j_id) == venc: pts += 1
-        resultado.append({"nome": a["nome"], "pontos": pts, "whatsapp": a["whatsapp"]})
-    return sorted(resultado, key=lambda x: x["pontos"], reverse=True)
-
+async def obter_ranking_geral():
+    """Gera o ranking atualizado apenas com apostas PAGAS"""
+    try:
+        # Puxa todos os jogos para conferir os resultados
+        jogos = supabase.table("jogos").select("*").execute().data
+        
+        # 🎯 O PULO DO GATO: Filtra apenas quem tem 'pago' como True
+        apostas_pagas = supabase.table("apostas").select("*").eq("pago", True).execute().data
+        
+        if not apostas_pagas:
+            return []
+            
+        # Chama a função de cálculo que criamos acima
+        return calcular_ranking(jogos, apostas_pagas)
+        
+    except Exception as e:
+        print(f"Erro ao gerar ranking: {e}")
+        return []
 # ---------------- ROTAS ADMIN ----------------
 
 @app.post("/login-admin")
@@ -164,3 +205,19 @@ async def sincronizar_resultados():
                                 supabase.table("jogos").update({"result": {"home": str(g["home"]), "away": str(g["away"])}}).eq("id", j["id"]).execute()
         except: pass
         await asyncio.sleep(3600)
+
+
+@app.get("/admin/apostas", dependencies=[Depends(verificar_admin)])
+async def listar_apostas_admin():
+    """Lista TODAS as apostas para o admin conferir e aprovar"""
+    res = supabase.table("apostas").select("*").order("created_at", desc=True).execute()
+    return res.data
+
+@app.put("/admin/aprovar-pagamento/{aposta_id}", dependencies=[Depends(verificar_admin)])
+async def aprovar_pagamento(aposta_id: str, status: bool):
+    """Muda o status de pagamento de uma aposta"""
+    try:
+        supabase.table("apostas").update({"pago": status}).eq("id", aposta_id).execute()
+        return {"status": "sucesso"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
