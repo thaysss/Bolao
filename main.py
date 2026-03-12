@@ -35,6 +35,15 @@ class NovoJogo(BaseModel):
     championship: str
     datetime: str
 
+class Configuracoes(BaseModel):
+    pix_key: str
+    pix_name: str
+    pix_amount: str
+    whatsapp: str
+    prize_1: str
+    prize_2: str
+    prize_3: str
+
 
 # ---------------- FUNÇÕES DE APOIO ----------------
 def calcular_ranking(jogos_oficiais, todas_apostas):
@@ -90,8 +99,9 @@ async def buscar_jogos(data: str = None):
         response = await client.get(url, headers=headers)
         return response.json()
 
-@app.post("/enviar-aposta")
+@app.post("/salvar-aposta")
 async def salvar_aposta(aposta: Aposta):
+    # ... resto do código continua igual ...
     """Recebe a aposta do frontend e salva REALMENTE no Supabase"""
     try:
         res = supabase.table("apostas").insert({
@@ -215,6 +225,24 @@ async def alternar_status_jogo(jogo_id: str, ativo: bool):
     """Admin pausa ou ativa um jogo (ex: fecha as apostas quando o jogo começa)"""
     try:
         supabase.table("jogos").update({"active": ativo}).eq("id", jogo_id).execute()
+        return {"status": "sucesso"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/configuracoes")
+async def obter_configuracoes():
+    """Puxa as configurações do banco para todo mundo que abrir o site"""
+    res = supabase.table("configuracoes").select("*").eq("id", 1).execute()
+    if res.data:
+        return res.data[0]
+    return {}
+
+@app.post("/salvar-configuracoes", dependencies=[Depends(verificar_admin)])
+async def atualizar_configuracoes(config: Configuracoes):
+    """Admin salva as configurações novas no banco"""
+    try:
+        supabase.table("configuracoes").update(config.model_dump()).eq("id", 1).execute()
         return {"status": "sucesso"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

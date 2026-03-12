@@ -374,12 +374,23 @@ const BACKEND_URL = ''; // Só isso! Duas aspas vazias.
 
 // ════════════════════════════════ STATE ════════════════════════════════
 const DEFAULT = {
-  pix:{key:'', name:'BolãoPRO', amount:'15,00', whatsapp:''},
-  prizes:{first:'R$ 200,00', second:'R$ 100,00', third:'R$ 50,00'},
-  apiKey:''
+  pix: {
+    key: 'emanuellythays15@gmail.com', 
+    name: 'Thays Emanuelly Lima', 
+    amount: '15.00', 
+    whatsapp: '5579999009962'
+  },
+  prizes: {
+    first: 'R$ 200,00', 
+    second: 'R$ 100,00', 
+    third: 'R$ 55,00'
+  },
+  apiKey: ''
 };
-let S = JSON.parse(localStorage.getItem('bolao3') || 'null') || structuredClone(DEFAULT);
-const save = () => localStorage.setItem('bolao3', JSON.stringify(S));
+
+// MUDAMOS AQUI DE 'bolao3' PARA 'bolao4' PARA LIMPAR O CACHE ANTIGO!
+let S = JSON.parse(localStorage.getItem('bolao4') || 'null') || structuredClone(DEFAULT);
+const save = () => localStorage.setItem('bolao4', JSON.stringify(S));
 
 let picks = {};
 let bettor = null;
@@ -814,16 +825,63 @@ async function delGame(id) {
   carregarJogosDoBanco();
 }
 
-function saveSettings() {
-  const amt=parseFloat(document.getElementById('bet-val').value)||15;
-  S.pix.key=document.getElementById('pix-key').value;
-  S.pix.name=document.getElementById('pix-name').value;
-  S.pix.amount=amt.toFixed(2).replace('.',',');
-  S.pix.whatsapp=document.getElementById('admin-wa').value;
-  S.prizes.first=document.getElementById('p1').value;
-  S.prizes.second=document.getElementById('p2').value;
-  S.prizes.third=document.getElementById('p3').value;
-  save(); toast('Configurações salvas!');
+async function saveSettings() {
+  const amt = parseFloat(document.getElementById('bet-val').value) || 15;
+  
+  const novasConfigs = {
+    pix_key: document.getElementById('pix-key').value,
+    pix_name: document.getElementById('pix-name').value,
+    pix_amount: amt.toFixed(2).replace('.',','),
+    whatsapp: document.getElementById('admin-wa').value,
+    prize_1: document.getElementById('p1').value,
+    prize_2: document.getElementById('p2').value,
+    prize_3: document.getElementById('p3').value
+  };
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/salvar-configuracoes`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-admin-token': adminToken 
+      },
+      body: JSON.stringify(novasConfigs)
+    });
+    
+    if (response.ok) {
+      toast('Configurações salvas no Banco de Dados!');
+      carregarConfiguracoes(); // Recarrega para aplicar na tela
+    } else {
+      toast('Erro ao salvar.', true);
+    }
+  } catch (error) {
+    toast('Erro de conexão.', true);
+  }
+}
+
+async function carregarConfiguracoes() {
+  try {
+    const response = await fetch(`${BACKEND_URL}/configuracoes`);
+    const configBanco = await response.json();
+    
+    if (configBanco && configBanco.pix_key) {
+      // Atualiza a variável S com os dados oficias do banco
+      S.pix.key = configBanco.pix_key;
+      S.pix.name = configBanco.pix_name;
+      S.pix.amount = configBanco.pix_amount;
+      S.pix.whatsapp = configBanco.whatsapp;
+      S.prizes.first = configBanco.prize_1;
+      S.prizes.second = configBanco.prize_2;
+      S.prizes.third = configBanco.prize_3;
+      
+      // Atualiza os prêmios na tela de Ranking se ela estiver aberta
+      if(document.getElementById('page-ranking').classList.contains('active')) {
+          renderRanking();
+      }
+    }
+  } catch (error) {
+    console.error("Erro ao carregar configurações:", error);
+  }
 }
 
 async function carregarJogosDoBanco() {
@@ -856,6 +914,7 @@ setInterval(()=>{
 },60000);
 
 // boot
+carregarConfiguracoes(); 
 carregarJogosDoBanco();
 </script>
 </body>
