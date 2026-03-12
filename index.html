@@ -676,16 +676,14 @@ function refreshApiStatus() {
 }
 
 // ──── API-FOOTBALL ────
-// Substitua a função apiFetch antiga por esta:
 async function apiFetch(path) {
-  // Extraímos a data da URL que o script antigo montava
+  // Pega a data que o script antigo tentava usar
   const urlParams = new URLSearchParams(path.split('?')[1]);
   const date = urlParams.get('date');
   
-  // Chamamos o SEU servidor no Railway em vez da API externa direta
+  // Chama o seu servidor corrigido
   const r = await fetch(`${BACKEND_URL}/buscar-api?data=${date}`);
-  
-  if (!r.ok) throw new Error('Erro ao buscar jogos no servidor');
+  if (!r.ok) throw new Error('Erro na API');
   return r.json();
 }
 
