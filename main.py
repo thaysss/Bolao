@@ -3,12 +3,20 @@ from pydantic import BaseModel
 from typing import Dict
 from datetime import datetime
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import os
 from supabase import create_client, Client
 import asyncio
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ---------------- CONFIGURAÇÕES E CHAVES ----------------
 
