@@ -244,7 +244,23 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 
     <div id="admin-content" style="display:none">
 
-      
+      <div class="admin-panel">
+        <div class="admin-section-title">🔌 API-Football (Jogos ao Vivo)</div>
+        <div class="info-box">
+          Cadastre-se <strong>gratuitamente</strong> em <a href="https://www.api-football.com" target="_blank">api-football.com</a> → sem cartão de crédito → copie sua <strong>API Key</strong> e cole abaixo. O plano free dá acesso a todos os campeonatos do mundo.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:flex-end">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Sua API Key</label>
+            <input class="form-input" id="api-key-in" type="text" placeholder="Cole aqui a chave da API-Football">
+          </div>
+          <button class="btn-primary" style="width:auto;padding:.7rem 1.1rem;font-size:.85rem" onclick="saveApiKey()">SALVAR</button>
+        </div>
+        <div class="api-status" id="api-status-box">
+          <div class="dot idle" id="api-dot"></div>
+          <span id="api-status-txt">Nenhuma API Key configurada</span>
+        </div>
+      </div>
 
       <div class="admin-panel" id="fetch-panel" style="display:none">
         <div class="admin-section-title">📅 Jogos do Dia</div>
