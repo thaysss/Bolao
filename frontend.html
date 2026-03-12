@@ -171,7 +171,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 
 <div class="toast" id="toast"></div>
 
-<!-- ══════════ APOSTAS ══════════ -->
 <div class="page active" id="page-apostas">
   <div class="hero">
     <div class="hero-badge">🔥 Bolão Ativo</div>
@@ -202,7 +201,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
   </div>
 </div>
 
-<!-- ══════════ RESULTADOS ══════════ -->
 <div class="page" id="page-resultados">
   <div class="container">
     <div class="hero" style="padding-bottom:.85rem">
@@ -213,7 +211,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
   </div>
 </div>
 
-<!-- ══════════ RANKING ══════════ -->
 <div class="page" id="page-ranking">
   <div class="container">
     <div class="hero" style="padding-bottom:.85rem">
@@ -225,7 +222,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
   </div>
 </div>
 
-<!-- ══════════ ADMIN ══════════ -->
 <div class="page" id="page-admin">
   <div class="container">
     <div class="hero" style="padding-bottom:.85rem">
@@ -242,13 +238,12 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
           <input class="form-input" id="admin-pw" type="password" placeholder="Senha do administrador" onkeydown="if(event.key==='Enter')doLogin()">
         </div>
         <button class="btn-primary" onclick="doLogin()">ENTRAR</button>
-        <div style="margin-top:.65rem;font-size:.72rem;color:var(--muted)">Padrão: admin123</div>
+        <div style="margin-top:.65rem;font-size:.72rem;color:var(--muted)">Padrão configurado no Servidor</div>
       </div>
     </div>
 
     <div id="admin-content" style="display:none">
 
-      <!-- API KEY -->
       <div class="admin-panel">
         <div class="admin-section-title">🔌 API-Football (Jogos ao Vivo)</div>
         <div class="info-box">
@@ -267,7 +262,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
         </div>
       </div>
 
-      <!-- BUSCAR JOGOS DO DIA -->
       <div class="admin-panel" id="fetch-panel" style="display:none">
         <div class="admin-section-title">📅 Importar Jogos do Dia</div>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end">
@@ -296,24 +290,19 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
         </div>
       </div>
 
-      <!-- JOGOS NO BOLÃO -->
       <div class="admin-panel">
         <div class="admin-section-title">⚽ Jogos no Bolão</div>
         <div class="admin-game-row header">
           <div>Casa</div><div>Fora</div><div>Campeonato</div><div>Data/Hora</div><div>Ativo</div><div></div>
         </div>
         <div id="admin-games-list"></div>
-        <button class="add-game-btn" onclick="addManual()">+ ADICIONAR MANUALMENTE</button>
       </div>
 
-      <!-- RESULTADOS ADMIN -->
       <div class="admin-panel">
         <div class="admin-section-title">📊 Resultados</div>
-        <button class="btn-primary" style="margin-bottom:.85rem" id="sync-btn" onclick="syncResults()">🔄 SINCRONIZAR VIA API</button>
         <div id="admin-results-list"></div>
       </div>
 
-      <!-- PIX -->
       <div class="admin-panel">
         <div class="admin-section-title">💸 Configurações PIX</div>
         <div class="form-group">
@@ -334,7 +323,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
         </div>
       </div>
 
-      <!-- PREMIAÇÕES -->
       <div class="admin-panel">
         <div class="admin-section-title">🏆 Premiações</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem">
@@ -350,7 +338,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
   </div>
 </div>
 
-<!-- MODAL PIX -->
 <div class="modal-overlay" id="pix-modal">
   <div class="modal">
     <button class="modal-close" onclick="closeModal()">✕</button>
@@ -380,15 +367,16 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 </div>
 
 <script>
+// ----------------------------------------------------------------------------------
+// ATENÇÃO: COLOQUE AQUI O LINK QUE O RAILWAY GEROU PARA SI (COM HTTPS E SEM BARRA NO FINAL)
+const BACKEND_URL = 'bolao-production-5360.up.railway.app'; 
+// ----------------------------------------------------------------------------------
 
-// Adicione isso logo no começo do <script>
-const BACKEND_URL = 'http://localhost:8000'; // Troque para sua URL de produção depois
 // ════════════════════════════════ STATE ════════════════════════════════
 const DEFAULT = {
-  games:[], bets:[],
   pix:{key:'', name:'BolãoPRO', amount:'15,00', whatsapp:''},
   prizes:{first:'R$ 200,00', second:'R$ 100,00', third:'R$ 50,00'},
-  apiKey:'', nextId:1
+  apiKey:''
 };
 let S = JSON.parse(localStorage.getItem('bolao3') || 'null') || structuredClone(DEFAULT);
 const save = () => localStorage.setItem('bolao3', JSON.stringify(S));
@@ -423,7 +411,6 @@ function renderPrizes(id) {
 // ════════════════════════════════ GAMES ════════════════════════════════
 function renderGames() {
   renderPrizes('prize-banner');
-  // 🎯 Agora usamos a lista oficial do servidor:
   const active = jogosNoBanco.filter(g => g.active); 
   const g = document.getElementById('games-grid');
   if (!active.length) {
@@ -507,15 +494,14 @@ function copyPix() {
 async function sendWA() {
   if (!bettor) return;
   
-  // Envia para o servidor Python usando a constante
   try {
-    const response = await fetch(`${BACKEND_URL}/enviar-aposta`, {
+    const response = await fetch(`${BACKEND_URL}/salvar-aposta`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
           nome: bettor.name,
           whatsapp: bettor.phone,
-          palpites: bettor.picks // Envia os palpites certinho pro Pydantic
+          palpites: bettor.picks
       })
     });
     
@@ -528,7 +514,6 @@ async function sendWA() {
     console.error("Erro ao salvar aposta:", error);
   }
 
-  // Abre o WhatsApp
   const active = jogosNoBanco.filter(g=>g.active);
   const lb = {home:'Casa',draw:'Empate',away:'Fora'};
   let msg = `🎯 *COMPROVANTE BOLÃO PRO*\n\n👤 *Nome:* ${bettor.name}\n📱 *WhatsApp:* ${bettor.phone}\n\n⚽ *PALPITES:*\n`;
@@ -569,22 +554,11 @@ function renderResults() {
 }
 
 // ════════════════════════════════ RANKING ════════════════════════════════
-function calcPts(bet) {
-  return S.games.reduce((acc,g) => {
-    if (!g.result || g.result.home==='' || g.result.away==='') return acc;
-    const p = bet.picks?.[g.id]; if (!p) return acc;
-    const h=+g.result.home, a=+g.result.away;
-    const actual = h>a?'home':h===a?'draw':'away';
-    return acc + (p===actual?1:0);
-  },0);
-}
-
 async function renderRanking() {
   renderPrizes('ranking-prizes');
   const el = document.getElementById('ranking-list');
   
   try {
-    // 1. Busca o ranking oficial e atualizado do seu backend Python
     const response = await fetch(`${BACKEND_URL}/ranking-geral`);
     const ranked = await response.json();
 
@@ -596,7 +570,6 @@ async function renderRanking() {
     const pm={0:S.prizes.first,1:S.prizes.second,2:S.prizes.third};
     const mm={0:'🥇',1:'🥈',2:'🥉'};
     
-    // 2. Monta o HTML com os dados vindos do banco de dados
     el.innerHTML = ranked.map((b,i)=>`
       <div class="rank-item ${i<3?'rank-'+(i+1):''}">
         <div class="rank-pos">${i+1}</div>
@@ -626,7 +599,7 @@ async function doLogin() {
     
     if (response.ok) {
       const data = await response.json();
-      adminToken = data.token; // 🎯 Guardamos o token que o Python enviou!
+      adminToken = data.token; 
       
       adminIn = true;
       document.getElementById('admin-login-area').style.display='none';
@@ -741,7 +714,7 @@ function renderFixtures() {
 
   document.getElementById('fixture-list').innerHTML = filtered.map(f => {
     const sel=selIds.has(f.fixture.id);
-    const already=!!S.games.find(g=>g.apiId===f.fixture.id);
+    const already=!!jogosNoBanco.find(g=>g.apiId===f.fixture.id);
     const kt=new Date(f.fixture.date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     return `<div class="fixture-item ${sel?'sel':''} ${already?'added':''}" onclick="${already?'':('toggleFix('+f.fixture.id+')')}">
       <div class="fixture-check">${sel?'✓':''}</div>
@@ -757,20 +730,17 @@ function toggleFix(id) {
   renderFixtures();
 }
 
-// Substitui a sua função addSelected atual [cite: 24, 27]
 async function addSelected() {
   let n = 0;
-  
   for (const fid of selIds) {
     const f = rawFixtures.find(x => x.fixture.id === fid);
     if (!f) continue;
     
-    // Envia o jogo para o Python salvar
     await fetch(`${BACKEND_URL}/adicionar-jogo`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'x-admin-token': adminToken // O crachá de segurança!
+        'x-admin-token': adminToken 
       },
       body: JSON.stringify({
         apiId: fid,
@@ -785,7 +755,7 @@ async function addSelected() {
   
   selIds = new Set();
   toast(`${n} jogo(s) adicionado(s)!`);
-  carregarJogosDoBanco(); // Recarrega a lista oficial
+  carregarJogosDoBanco(); 
   renderFixtures();
 }
 
@@ -804,20 +774,19 @@ function renderAdminGames() {
 
 function renderAdminResults() {
   const el=document.getElementById('admin-results-list');
-  if (!S.games.length) { el.innerHTML='<p style="color:var(--muted);font-size:.85rem">Nenhum jogo.</p>'; return; }
-  el.innerHTML = S.games.map(g => {
+  if (!jogosNoBanco.length) { el.innerHTML='<p style="color:var(--muted);font-size:.85rem">Nenhum jogo.</p>'; return; }
+  el.innerHTML = jogosNoBanco.map(g => {
     const r=g.result||{home:'',away:''};
     return `<div class="result-row">
       <span style="font-size:.82rem">${g.home} × ${g.away}</span>
-      <input class="admin-input" type="number" min="0" placeholder="Casa" value="${r.home}" onchange="updRes(${g.id},'home',this.value)" style="text-align:center">
+      <input class="admin-input" type="number" min="0" placeholder="Casa" value="${r.home}" disabled style="text-align:center">
       <span style="text-align:center;color:var(--muted)">×</span>
-      <input class="admin-input" type="number" min="0" placeholder="Fora" value="${r.away}" onchange="updRes(${g.id},'away',this.value)" style="text-align:center">
-      <button class="toggle-btn" onclick="saveRes(${g.id})">💾 Salvar</button>
+      <input class="admin-input" type="number" min="0" placeholder="Fora" value="${r.away}" disabled style="text-align:center">
+      <button class="toggle-btn" disabled>Auto</button>
     </div>`;
   }).join('');
 }
 
-function upd(id,f,v){const g=S.games.find(x=>x.id===id);if(g){g[f]=v;save();}}
 async function togGame(id) {
   const g = jogosNoBanco.find(x => x.id === id);
   if(!g) return;
@@ -832,7 +801,7 @@ async function togGame(id) {
       toast('Erro ao alterar status', true);
   }
 }
-// Substitui a sua delGame atual [cite: 27]
+
 async function delGame(id) {
   if (!confirm('Tem certeza que deseja excluir este jogo?')) return;
   
@@ -843,30 +812,6 @@ async function delGame(id) {
   
   toast('Jogo removido!');
   carregarJogosDoBanco();
-}
-function addManual(){S.games.push({id:S.nextId++,home:'Time A',away:'Time B',championship:'Campeonato',datetime:'',active:true,result:null});save();renderAdminGames();renderAdminResults();}
-function updRes(id,s,v){const g=S.games.find(x=>x.id===id);if(!g)return;if(!g.result)g.result={home:'',away:''};g.result[s]=v;}
-function saveRes(id){save();toast('Resultado salvo!');}
-
-async function syncResults() {
-  if (!S.apiKey) return toast('Configure a API Key!');
-  const btn=document.getElementById('sync-btn');
-  btn.disabled=true; btn.textContent='⏳ Sincronizando...';
-  let n=0;
-  for (const g of S.games) {
-    if (!g.apiId) continue;
-    try {
-      const data = await apiFetch('/fixtures?id='+g.apiId);
-      const f=data.response?.[0]; if (!f) continue;
-      const done=['FT','AET','PEN','WO'].includes(f.fixture.status.short);
-      if (done && f.goals.home!=null && f.goals.away!=null) {
-        g.result={home:String(f.goals.home), away:String(f.goals.away)}; n++;
-      }
-    } catch(e){/* skip */}
-  }
-  save(); renderAdminResults();
-  btn.disabled=false; btn.textContent='🔄 SINCRONIZAR VIA API';
-  toast(`${n} resultado${n!==1?'s':''} sincronizado${n!==1?'s':''}!`);
 }
 
 function saveSettings() {
@@ -880,18 +825,22 @@ function saveSettings() {
   S.prizes.third=document.getElementById('p3').value;
   save(); toast('Configurações salvas!');
 }
+
 async function carregarJogosDoBanco() {
   try {
     const response = await fetch(`${BACKEND_URL}/jogos`);
     jogosNoBanco = await response.json();
     
-    // Atualiza as telas com os dados reais
-    renderGames(); // Tela principal de apostas
-    renderAdminGames(); // Painel do admin
+    renderGames(); 
+    if(adminIn) {
+      renderAdminGames(); 
+      renderAdminResults();
+    }
   } catch (error) {
     console.error("Erro ao carregar jogos:", error);
   }
 }
+
 // ════════════════════════════════ UTILS ════════════════════════════════
 function toast(msg, isErr=false) {
   const t=document.getElementById('toast');
@@ -907,10 +856,6 @@ setInterval(()=>{
 },60000);
 
 // boot
-renderGames();
-
-
-// Chame essa função logo que o site carregar (no final do seu script)
 carregarJogosDoBanco();
 </script>
 </body>
