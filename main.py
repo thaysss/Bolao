@@ -101,16 +101,18 @@ async def buscar_jogos(data: str = None):
 
 @app.post("/salvar-aposta")
 async def salvar_aposta(aposta: Aposta):
-    # ... resto do código continua igual ...
-    """Recebe a aposta do frontend e salva REALMENTE no Supabase"""
     try:
-        res = supabase.table("apostas").insert({
+        # O model_dump() garante que os dados vãos no formato que o Supabase entende
+        dados = {
             "nome": aposta.nome,
             "whatsapp": aposta.whatsapp,
             "palpites": aposta.palpites
-        }).execute()
-        return {"status": "sucesso", "mensagem": "Aposta registrada com sucesso no banco de dados!"}
+        }
+        res = supabase.table("apostas").insert(dados).execute()
+        return {"status": "sucesso"}
     except Exception as e:
+        # Isso vai mostrar o erro exato lá na tela preta do Railway para você
+        print(f"ERRO CRÍTICO NO BANCO: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/ranking-geral")
