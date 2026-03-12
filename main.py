@@ -1,11 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import Dict
 from datetime import datetime
 import httpx
 import os
 from supabase import create_client, Client
-from fastapi_utils.tasks import repeat_every
 import asyncio
 
 app = FastAPI()
@@ -18,7 +17,6 @@ FOOTBALL_API_KEY = os.getenv("FOOTBALL_API_KEY", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123") # admin123 fica só como um padrão provisório de teste
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
 # ---------------- MODELOS DE DADOS ----------------
 class Aposta(BaseModel):
     nome: str
