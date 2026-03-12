@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BolãoPRO — Apostas & Premiações</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--green:#00e676;--green-dark:#00c853;--gold:#ffd600;--silver:#b0bec5;--bronze:#ff7043;--bg:#0a0f0a;--bg2:#111a11;--bg3:#162016;--card:#1a2a1a;--text:#e8f5e9;--muted:#7c9e7c;--red:#ff1744;--blue:#2979ff;--border:#2a402a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:60px;background:rgba(10,15,10,.96);border-bottom:1px solid var(--border);backdrop-filter:blur(12px)}
+.logo{font-family:'Bebas Neue',cursive;font-size:1.8rem;letter-spacing:3px;background:linear-gradient(135deg,var(--green),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-tabs{display:flex;gap:.2rem}
+.nav-tab{padding:.35rem .85rem;border-radius:6px;border:none;background:transparent;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.nav-tab.active,.nav-tab:hover{background:var(--bg3);color:var(--green)}
+.nav-tab.active{border:1px solid var(--border)}
+.page{display:none;padding-top:72px;min-height:100vh}
+.page.active{display:block}
+.hero{text-align:center;padding:2.5rem 1rem 1.5rem}
+.hero-badge{display:inline-block;background:var(--bg3);border:1px solid var(--green);color:var(--green);font-family:'Barlow Condensed',sans-serif;font-size:.7rem;letter-spacing:3px;text-transform:uppercase;padding:.25rem .9rem;border-radius:100px;margin-bottom:1rem;animation:pulse-border 2s infinite}
+@keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,.3)}50%{box-shadow:0 0 0 6px rgba(0,230,118,0)}}
+.hero h1{font-family:'Bebas Neue',cursive;font-size:clamp(2.5rem,7vw,5rem);line-height:.95;letter-spacing:2px;margin-bottom:.75rem}
+.hero h1 span{color:var(--green)}
+.hero p{color:var(--muted);font-size:1rem;max-width:480px;margin:0 auto 1.5rem}
+.container{max-width:860px;margin:0 auto;padding:0 1rem 3rem}
+.section-title{font-family:'Bebas Neue',cursive;font-size:1.6rem;letter-spacing:2px;color:var(--green);margin-bottom:.2rem}
+.section-sub{color:var(--muted);font-size:.82rem;margin-bottom:1.25rem}
+.prize-banner{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:2rem}
+.prize-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem .75rem;text-align:center;position:relative;overflow:hidden}
+.prize-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.prize-card.gold::before{background:var(--gold)}.prize-card.silver::before{background:var(--silver)}.prize-card.bronze::before{background:var(--bronze)}
+.prize-pos{font-family:'Bebas Neue',cursive;font-size:2.5rem;line-height:1}
+.gold .prize-pos{color:var(--gold)}.silver .prize-pos{color:var(--silver)}.bronze .prize-pos{color:var(--bronze)}
+.prize-label{font-family:'Barlow Condensed',sans-serif;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.prize-value{font-family:'Bebas Neue',cursive;font-size:1.3rem;letter-spacing:1px}
+.gold .prize-value{color:var(--gold)}.silver .prize-value{color:var(--silver)}.bronze .prize-value{color:var(--bronze)}
+.games-grid{display:flex;flex-direction:column;gap:.65rem;margin-bottom:1.5rem}
+.game-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.3rem;transition:border-color .2s}
+.game-card:hover{border-color:var(--green)}
+.game-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem;flex-wrap:wrap;gap:.4rem}
+.game-championship{font-family:'Barlow Condensed',sans-serif;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--green);background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.2);padding:.12rem .55rem;border-radius:100px}
+.game-time{font-size:.72rem;color:var(--muted)}
+.game-teams{display:grid;grid-template-columns:1fr auto 1fr;gap:.4rem;align-items:center;margin-bottom:1rem}
+.team-name{font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;letter-spacing:.5px}
+.team-home{text-align:right}.team-away{text-align:left}
+.vs-badge{font-family:'Bebas Neue',cursive;font-size:1rem;color:var(--muted);background:var(--bg3);padding:.15rem .5rem;border-radius:6px}
+.bet-options{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+.bet-btn{padding:.55rem;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.82rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .18s}
+.bet-btn:hover{border-color:var(--green);color:var(--text)}
+.bet-btn.selected-home{background:rgba(41,121,255,.18);border-color:var(--blue);color:var(--blue)}
+.bet-btn.selected-draw{background:rgba(255,214,0,.12);border-color:var(--gold);color:var(--gold)}
+.bet-btn.selected-away{background:rgba(255,23,68,.15);border-color:var(--red);color:var(--red)}
+.bet-summary{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.3rem;margin-bottom:1.25rem}
+.bet-summary-title{font-family:'Bebas Neue',cursive;font-size:1.2rem;letter-spacing:2px;margin-bottom:.85rem;color:var(--green)}
+.summary-row{display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem}
+.summary-row:last-child{border-bottom:none}
+.summary-pick{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.8rem;padding:.12rem .45rem;border-radius:4px}
+.pick-home{background:rgba(41,121,255,.18);color:var(--blue)}.pick-draw{background:rgba(255,214,0,.12);color:var(--gold)}.pick-away{background:rgba(255,23,68,.15);color:var(--red)}
+.form-group{margin-bottom:.85rem}
+.form-label{display:block;font-family:'Barlow Condensed',sans-serif;font-size:.7rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.7rem .9rem;color:var(--text);font-family:'Barlow',sans-serif;font-size:.9rem;transition:border-color .2s}
+.form-input:focus{outline:none;border-color:var(--green)}
+.btn-primary{width:100%;padding:.9rem;border-radius:10px;border:none;background:linear-gradient(135deg,var(--green-dark),var(--green));color:#000;font-family:'Bebas Neue',cursive;font-size:1.2rem;letter-spacing:3px;cursor:pointer;transition:all .2s;box-shadow:0 4px 20px rgba(0,230,118,.2)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,230,118,.35)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-secondary{width:100%;padding:.8rem;border-radius:10px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'Bebas Neue',cursive;font-size:1rem;letter-spacing:2px;cursor:pointer;transition:all .2s;margin-top:.65rem}
+.btn-secondary:hover{border-color:var(--green);color:var(--green)}
+.pix-screen{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.75rem;text-align:center;max-width:480px;margin:0 auto}
+.pix-icon{font-size:3rem;margin-bottom:.75rem}
+.pix-title{font-family:'Bebas Neue',cursive;font-size:1.8rem;letter-spacing:2px;color:var(--green);margin-bottom:.3rem}
+.pix-amount{font-family:'Bebas Neue',cursive;font-size:2.8rem;color:var(--gold);margin:.85rem 0}
+.pix-key-box{background:var(--bg3);border:1px solid var(--green);border-radius:10px;padding:.9rem;margin:.85rem 0}
+.pix-key-label{font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
+.pix-key{font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:600;color:var(--green);word-break:break-all}
+.copy-btn{background:rgba(0,230,118,.1);border:1px solid var(--green);color:var(--green);border-radius:6px;padding:.35rem .75rem;font-size:.75rem;cursor:pointer;margin-top:.45rem;transition:all .2s}
+.copy-btn:hover{background:rgba(0,230,118,.2)}
+.warning-box{background:rgba(255,214,0,.06);border:1px solid rgba(255,214,0,.3);border-radius:10px;padding:.9rem;margin:1rem 0;font-size:.82rem;color:var(--gold);text-align:left;line-height:1.6}
+.whatsapp-btn{width:100%;padding:.9rem;border-radius:10px;border:none;background:linear-gradient(135deg,#128C7E,#25D366);color:#fff;font-family:'Bebas Neue',cursive;font-size:1.2rem;letter-spacing:2px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem;box-shadow:0 4px 20px rgba(37,211,102,.25)}
+.whatsapp-btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(37,211,102,.4)}
+.ranking-list{display:flex;flex-direction:column;gap:.55rem}
+.rank-item{display:grid;grid-template-columns:48px 1fr auto;gap:.85rem;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:.9rem 1.1rem}
+.rank-item.rank-1{border-color:var(--gold);background:rgba(255,214,0,.04)}.rank-item.rank-2{border-color:var(--silver);background:rgba(176,190,197,.04)}.rank-item.rank-3{border-color:var(--bronze);background:rgba(255,112,67,.04)}
+.rank-pos{font-family:'Bebas Neue',cursive;font-size:1.9rem;text-align:center}
+.rank-1 .rank-pos{color:var(--gold)}.rank-2 .rank-pos{color:var(--silver)}.rank-3 .rank-pos{color:var(--bronze)}
+.rank-item:not(.rank-1):not(.rank-2):not(.rank-3) .rank-pos{color:var(--muted)}
+.rank-name{font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;font-weight:700}
+.rank-hits{font-size:.78rem;color:var(--muted);margin-top:.12rem}
+.rank-points{font-family:'Bebas Neue',cursive;font-size:1.5rem;color:var(--green);text-align:right}
+.rank-pts-label{font-size:.6rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:right}
+.rank-prize{font-family:'Barlow Condensed',sans-serif;font-size:.82rem;font-weight:600;margin-top:.15rem;text-align:right}
+.rank-1 .rank-prize{color:var(--gold)}.rank-2 .rank-prize{color:var(--silver)}.rank-3 .rank-prize{color:var(--bronze)}
+.result-game{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.3rem;margin-bottom:.65rem}
+.result-teams{display:grid;grid-template-columns:1fr auto 1fr;gap:.4rem;align-items:center;text-align:center}
+.result-score{font-family:'Bebas Neue',cursive;font-size:1.9rem;color:var(--gold);padding:.18rem .7rem;background:var(--bg3);border-radius:8px;min-width:80px}
+.result-status{display:inline-block;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;padding:.18rem .55rem;border-radius:100px;margin-bottom:.65rem}
+.status-finished{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.3)}
+.status-live{background:rgba(255,23,68,.1);color:var(--red);border:1px solid rgba(255,23,68,.3);animation:blink 1.2s infinite}
+.status-upcoming{background:rgba(176,190,197,.1);color:var(--silver);border:1px solid rgba(176,190,197,.3)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.admin-panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.35rem;margin-bottom:1.25rem}
+.admin-section-title{font-family:'Bebas Neue',cursive;font-size:1.3rem;letter-spacing:2px;color:var(--green);margin-bottom:.9rem}
+.admin-game-row{display:grid;grid-template-columns:1fr 1fr 110px 90px 70px 44px;gap:.4rem;align-items:center;margin-bottom:.4rem}
+.admin-game-row.header{font-family:'Barlow Condensed',sans-serif;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem}
+.admin-input{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:.45rem .65rem;color:var(--text);font-family:'Barlow',sans-serif;font-size:.82rem;width:100%}
+.admin-input:focus{outline:none;border-color:var(--green)}
+.toggle-btn{padding:.45rem .5rem;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;font-size:.7rem;font-family:'Barlow Condensed',sans-serif;font-weight:600;letter-spacing:1px;text-transform:uppercase;transition:all .2s;white-space:nowrap}
+.toggle-btn.on{background:rgba(0,230,118,.1);border-color:var(--green);color:var(--green)}
+.del-btn{padding:.45rem;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:.95rem;transition:all .2s;width:100%}
+.del-btn:hover{border-color:var(--red);color:var(--red)}
+.add-game-btn{background:rgba(0,230,118,.08);border:1px dashed var(--green);color:var(--green);border-radius:8px;padding:.6rem;width:100%;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;margin-top:.4rem}
+.add-game-btn:hover{background:rgba(0,230,118,.15)}
+.api-panel{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:1.1rem;margin-bottom:1rem}
+.api-status{display:flex;align-items:center;gap:.5rem;font-size:.82rem;margin-top:.65rem}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot.ok{background:var(--green)}.dot.err{background:var(--red)}.dot.idle{background:var(--muted)}.dot.loading{background:var(--gold);animation:blink .8s infinite}
+.fixture-list{max-height:380px;overflow-y:auto;margin-top:.75rem;display:flex;flex-direction:column;gap:.35rem}
+.fixture-list::-webkit-scrollbar{width:4px}
+.fixture-list::-webkit-scrollbar-track{background:var(--bg3)}
+.fixture-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.fixture-item{display:flex;align-items:center;gap:.65rem;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.6rem .9rem;cursor:pointer;transition:all .2s}
+.fixture-item:hover{border-color:var(--green)}
+.fixture-item.sel{border-color:var(--green);background:rgba(0,230,118,.06)}
+.fixture-item.added{opacity:.55;cursor:default}
+.fixture-champ{font-family:'Barlow Condensed',sans-serif;font-size:.62rem;letter-spacing:1px;text-transform:uppercase;color:var(--green);min-width:100px}
+.fixture-teams{flex:1;font-family:'Barlow Condensed',sans-serif;font-size:.92rem;font-weight:600}
+.fixture-time{font-size:.7rem;color:var(--muted);min-width:40px;text-align:right}
+.fixture-check{width:18px;height:18px;border-radius:4px;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.7rem;transition:all .2s}
+.fixture-item.sel .fixture-check{background:var(--green);border-color:var(--green);color:#000}
+.league-filter{display:flex;flex-wrap:wrap;gap:.3rem;margin:.65rem 0}
+.lbtn{padding:.28rem .6rem;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.68rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.lbtn.on{border-color:var(--green);color:var(--green);background:rgba(0,230,118,.08)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;align-items:center;justify-content:center;padding:1rem}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:1.75rem;width:100%;max-width:480px;position:relative;max-height:90vh;overflow-y:auto}
+.modal-close{position:absolute;top:.85rem;right:.85rem;background:var(--bg3);border:1px solid var(--border);color:var(--muted);border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:.9rem;transition:all .2s}
+.modal-close:hover{color:var(--text);border-color:var(--text)}
+.admin-login{max-width:340px;margin:2.5rem auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.75rem;text-align:center}
+.toast{position:fixed;bottom:1.75rem;left:50%;transform:translateX(-50%) translateY(100px);background:var(--green-dark);color:#000;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.85rem;letter-spacing:1px;padding:.65rem 1.35rem;border-radius:100px;z-index:999;transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.err{background:var(--red);color:#fff}
+.empty-state{text-align:center;padding:2.5rem 1rem;color:var(--muted)}
+.empty-state-icon{font-size:2.5rem;margin-bottom:.85rem}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.result-row{display:grid;grid-template-columns:1fr 56px 14px 56px 72px;gap:.4rem;align-items:center;margin-bottom:.45rem}
+.info-box{background:rgba(0,230,118,.05);border:1px solid rgba(0,230,118,.2);border-radius:10px;padding:.85rem;margin-bottom:.85rem;font-size:.82rem;color:var(--muted);line-height:1.6}
+.info-box a{color:var(--green);text-decoration:none}
+.info-box a:hover{text-decoration:underline}
+@media(max-width:600px){
+  .admin-game-row{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;gap:.35rem}
+  .admin-game-row.header{display:none}
+  nav{padding:0 .75rem}
+  .nav-tabs{gap:.06rem}
+  .nav-tab{padding:.28rem .45rem;font-size:.65rem}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">BolãoPRO</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="goPage('apostas',this)">🎯 Apostar</button>
+    <button class="nav-tab" onclick="goPage('resultados',this)">📊 Resultados</button>
+    <button class="nav-tab" onclick="goPage('ranking',this)">🏆 Ranking</button>
+    <button class="nav-tab" onclick="goPage('admin',this)">⚙️ Admin</button>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<!-- ══════════ APOSTAS ══════════ -->
+<div class="page active" id="page-apostas">
+  <div class="hero">
+    <div class="hero-badge">🔥 Bolão Ativo</div>
+    <h1>FAÇA SUA<br><span>APOSTA</span></h1>
+    <p>Escolha o resultado de cada jogo e concorra a prêmios incríveis!</p>
+  </div>
+  <div class="container">
+    <div class="prize-banner" id="prize-banner"></div>
+    <div class="section-title">JOGOS DISPONÍVEIS</div>
+    <div class="section-sub">Selecione sua previsão para cada partida</div>
+    <div class="games-grid" id="games-grid"></div>
+    <div class="bet-summary" id="bet-summary" style="display:none">
+      <div class="bet-summary-title">RESUMO DO PALPITE</div>
+      <div id="summary-rows"></div>
+    </div>
+    <div id="bettor-form" style="display:none">
+      <div class="section-title" style="margin-bottom:.85rem">SEUS DADOS</div>
+      <div class="form-group">
+        <label class="form-label">Nome completo</label>
+        <input class="form-input" id="bettor-name" type="text" placeholder="Seu nome completo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">WhatsApp</label>
+        <input class="form-input" id="bettor-phone" type="tel" placeholder="(11) 99999-9999">
+      </div>
+      <button class="btn-primary" onclick="confirmBet()">CONFIRMAR PALPITE →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ RESULTADOS ══════════ -->
+<div class="page" id="page-resultados">
+  <div class="container">
+    <div class="hero" style="padding-bottom:.85rem">
+      <div class="hero-badge">📊 Atualização automática</div>
+      <h1>RESULTADO<br><span>DOS JOGOS</span></h1>
+    </div>
+    <div id="results-list"></div>
+  </div>
+</div>
+
+<!-- ══════════ RANKING ══════════ -->
+<div class="page" id="page-ranking">
+  <div class="container">
+    <div class="hero" style="padding-bottom:.85rem">
+      <div class="hero-badge">🏆 Classificação Geral</div>
+      <h1>RANKING<br><span>DOS CRAQUES</span></h1>
+    </div>
+    <div class="prize-banner" id="ranking-prizes"></div>
+    <div class="ranking-list" id="ranking-list"></div>
+  </div>
+</div>
+
+<!-- ══════════ ADMIN ══════════ -->
+<div class="page" id="page-admin">
+  <div class="container">
+    <div class="hero" style="padding-bottom:.85rem">
+      <div class="hero-badge">⚙️ Painel Administrativo</div>
+      <h1>GESTÃO<br><span>DO BOLÃO</span></h1>
+    </div>
+
+    <div id="admin-login-area">
+      <div class="admin-login">
+        <div style="font-size:2.2rem;margin-bottom:.85rem">🔐</div>
+        <div class="section-title" style="text-align:center;margin-bottom:.4rem">ADMIN</div>
+        <div class="section-sub" style="text-align:center;margin-bottom:1.25rem">Senha para acessar o painel</div>
+        <div class="form-group">
+          <input class="form-input" id="admin-pw" type="password" placeholder="Senha do administrador" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn-primary" onclick="doLogin()">ENTRAR</button>
+        <div style="margin-top:.65rem;font-size:.72rem;color:var(--muted)">Padrão: admin123</div>
+      </div>
+    </div>
+
+    <div id="admin-content" style="display:none">
+
+      <!-- API KEY -->
+      <div class="admin-panel">
+        <div class="admin-section-title">🔌 API-Football (Jogos ao Vivo)</div>
+        <div class="info-box">
+          Cadastre-se <strong>gratuitamente</strong> em <a href="https://www.api-football.com" target="_blank">api-football.com</a> → sem cartão de crédito → copie sua <strong>API Key</strong> e cole abaixo. O plano free dá acesso a todos os campeonatos do mundo.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:flex-end">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Sua API Key</label>
+            <input class="form-input" id="api-key-in" type="text" placeholder="Cole aqui a chave da API-Football">
+          </div>
+          <button class="btn-primary" style="width:auto;padding:.7rem 1.1rem;font-size:.85rem" onclick="saveApiKey()">SALVAR</button>
+        </div>
+        <div class="api-status" id="api-status-box">
+          <div class="dot idle" id="api-dot"></div>
+          <span id="api-status-txt">Nenhuma API Key configurada</span>
+        </div>
+      </div>
+
+      <!-- BUSCAR JOGOS DO DIA -->
+      <div class="admin-panel" id="fetch-panel" style="display:none">
+        <div class="admin-section-title">📅 Importar Jogos do Dia</div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end">
+          <button class="btn-primary" style="width:auto;padding:.65rem 1.1rem;font-size:.82rem" onclick="fetchToday()">🔄 HOJE</button>
+          <input class="admin-input" id="pick-date" type="date" style="width:auto;min-width:148px">
+          <button class="btn-primary" style="width:auto;padding:.65rem 1rem;font-size:.82rem" onclick="fetchByDate()">📆 BUSCAR DATA</button>
+        </div>
+
+        <div id="fetch-status" style="display:none" class="api-status">
+          <div class="spin"></div><span id="fetch-status-txt">Buscando...</span>
+        </div>
+
+        <div id="league-wrap" style="display:none">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.68rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:.9rem;margin-bottom:.35rem">Filtrar liga</div>
+          <div class="league-filter" id="league-filter"></div>
+        </div>
+
+        <div id="fixtures-wrap" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:.75rem 0 .35rem;flex-wrap:wrap;gap:.4rem">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:.78rem;color:var(--muted)">
+              <span id="fix-count">0</span> jogos &nbsp;·&nbsp; <span id="fix-sel">0</span> selecionados
+            </div>
+            <button class="toggle-btn on" id="add-fix-btn" style="display:none" onclick="addSelected()">➕ ADICIONAR SELECIONADOS</button>
+          </div>
+          <div class="fixture-list" id="fixture-list"></div>
+        </div>
+      </div>
+
+      <!-- JOGOS NO BOLÃO -->
+      <div class="admin-panel">
+        <div class="admin-section-title">⚽ Jogos no Bolão</div>
+        <div class="admin-game-row header">
+          <div>Casa</div><div>Fora</div><div>Campeonato</div><div>Data/Hora</div><div>Ativo</div><div></div>
+        </div>
+        <div id="admin-games-list"></div>
+        <button class="add-game-btn" onclick="addManual()">+ ADICIONAR MANUALMENTE</button>
+      </div>
+
+      <!-- RESULTADOS ADMIN -->
+      <div class="admin-panel">
+        <div class="admin-section-title">📊 Resultados</div>
+        <button class="btn-primary" style="margin-bottom:.85rem" id="sync-btn" onclick="syncResults()">🔄 SINCRONIZAR VIA API</button>
+        <div id="admin-results-list"></div>
+      </div>
+
+      <!-- PIX -->
+      <div class="admin-panel">
+        <div class="admin-section-title">💸 Configurações PIX</div>
+        <div class="form-group">
+          <label class="form-label">Chave PIX</label>
+          <input class="form-input" id="pix-key" placeholder="email / CPF / telefone / aleatória">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nome do Beneficiário</label>
+          <input class="form-input" id="pix-name" placeholder="Nome que aparece no PIX">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valor da Aposta (R$)</label>
+          <input class="form-input" id="bet-val" type="number" step="0.01" placeholder="15.00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">WhatsApp para receber comprovantes (com DDI)</label>
+          <input class="form-input" id="admin-wa" placeholder="5511999999999">
+        </div>
+      </div>
+
+      <!-- PREMIAÇÕES -->
+      <div class="admin-panel">
+        <div class="admin-section-title">🏆 Premiações</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem">
+          <div class="form-group"><label class="form-label">🥇 1º Lugar</label><input class="form-input" id="p1" placeholder="R$ 200"></div>
+          <div class="form-group"><label class="form-label">🥈 2º Lugar</label><input class="form-input" id="p2" placeholder="R$ 100"></div>
+          <div class="form-group"><label class="form-label">🥉 3º Lugar</label><input class="form-input" id="p3" placeholder="R$ 50"></div>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="saveSettings()">💾 SALVAR CONFIGURAÇÕES</button>
+      <button class="btn-secondary" onclick="doLogout()">SAIR DO ADMIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PIX -->
+<div class="modal-overlay" id="pix-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="pix-screen">
+      <div class="pix-icon">💸</div>
+      <div class="pix-title">PAGUE COM PIX</div>
+      <div style="color:var(--muted);font-size:.82rem">Para confirmar sua participação</div>
+      <div class="pix-amount" id="modal-amt">R$ 15,00</div>
+      <div class="pix-key-box">
+        <div class="pix-key-label">Chave PIX</div>
+        <div class="pix-key" id="modal-key">—</div>
+        <button class="copy-btn" onclick="copyPix()">📋 Copiar chave</button>
+      </div>
+      <div class="pix-key-box" style="margin-top:.45rem">
+        <div class="pix-key-label">Beneficiário</div>
+        <div class="pix-key" id="modal-name">—</div>
+      </div>
+      <div class="warning-box">
+        ⚠️ <strong>ATENÇÃO:</strong> Seu palpite só será validado após confirmação do pagamento. Envie o comprovante pelo WhatsApp abaixo com seu nome.
+      </div>
+      <button class="whatsapp-btn" onclick="sendWA()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        ENVIAR COMPROVANTE
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// Adicione isso logo no começo do <script>
+const BACKEND_URL = 'http://localhost:8000'; // Troque para sua URL de produção depois
+// ════════════════════════════════ STATE ════════════════════════════════
+const DEFAULT = {
+  games:[], bets:[],
+  pix:{key:'', name:'BolãoPRO', amount:'15,00', whatsapp:''},
+  prizes:{first:'R$ 200,00', second:'R$ 100,00', third:'R$ 50,00'},
+  apiKey:'', nextId:1
+};
+let S = JSON.parse(localStorage.getItem('bolao3') || 'null') || structuredClone(DEFAULT);
+const save = () => localStorage.setItem('bolao3', JSON.stringify(S));
+
+let picks = {};
+let bettor = null;
+let rawFixtures = [];
+let selIds = new Set();
+let leagueFilter = 'all';
+let adminIn = false;
+let adminToken = "";
+let jogosNoBanco = [];
+
+// ════════════════════════════════ NAV ════════════════════════════════
+function goPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+  ({apostas: renderGames, resultados: renderResults, ranking: renderRanking, admin: renderAdmin})[name]?.();
+}
+
+// ════════════════════════════════ PRIZES ════════════════════════════════
+function renderPrizes(id) {
+  document.getElementById(id).innerHTML = [
+    ['gold','🥇','1º',S.prizes.first], ['silver','🥈','2º',S.prizes.second], ['bronze','🥉','3º',S.prizes.third]
+  ].map(([c,e,l,v]) => `<div class="prize-card ${c}">
+    <div class="prize-label">${l} Lugar</div><div class="prize-pos">${e}</div><div class="prize-value">${v}</div>
+  </div>`).join('');
+}
+
+// ════════════════════════════════ GAMES ════════════════════════════════
+function renderGames() {
+  renderPrizes('prize-banner');
+  // 🎯 Agora usamos a lista oficial do servidor:
+  const active = jogosNoBanco.filter(g => g.active); 
+  const g = document.getElementById('games-grid');
+  if (!active.length) {
+    g.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚽</div><p>Nenhum jogo disponível.<br>Aguarde o administrador configurar o bolão.</p></div>`;
+    document.getElementById('bet-summary').style.display = 'none';
+    document.getElementById('bettor-form').style.display = 'none';
+    return;
+  }
+  g.innerHTML = active.map(({id, home, away, championship, datetime}) => {
+    const p = picks[id];
+    const dt = datetime ? new Date(datetime).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    return `<div class="game-card" id="gc-${id}">
+      <div class="game-meta"><span class="game-championship">${championship}</span><span class="game-time">📅 ${dt}</span></div>
+      <div class="game-teams">
+        <div class="team-name team-home">${home}</div>
+        <div class="vs-badge">VS</div>
+        <div class="team-name team-away">${away}</div>
+      </div>
+      <div class="bet-options">
+        <button class="bet-btn ${p==='home'?'selected-home':''}" onclick="doPick('${id}','home',this)">🏠 Casa</button>
+        <button class="bet-btn ${p==='draw'?'selected-draw':''}" onclick="doPick('${id}','draw',this)">🤝 Empate</button>
+        <button class="bet-btn ${p==='away'?'selected-away':''}" onclick="doPick('${id}','away',this)">✈️ Fora</button>
+      </div>
+    </div>`;
+  }).join('');
+  updateSummary();
+}
+
+function doPick(id, choice, btn) {
+  picks[id] = choice;
+  const card = document.getElementById('gc-' + id);
+  card.querySelectorAll('.bet-btn').forEach(b => b.classList.remove('selected-home','selected-draw','selected-away'));
+  btn.classList.add('selected-' + choice);
+  updateSummary();
+}
+
+function updateSummary() {
+  const active = jogosNoBanco.filter(g => g.active);
+  const done = Object.keys(picks).filter(id => active.find(g => g.id === id));
+  const sum = document.getElementById('bet-summary');
+  const frm = document.getElementById('bettor-form');
+  if (!done.length) { sum.style.display='none'; frm.style.display='none'; return; }
+  sum.style.display = 'block';
+  frm.style.display = done.length === active.length ? 'block' : 'none';
+  const lb = {home:'🏠 Casa',draw:'🤝 Empate',away:'✈️ Fora'};
+  const cl = {home:'pick-home',draw:'pick-draw',away:'pick-away'};
+  document.getElementById('summary-rows').innerHTML =
+    done.map(id => {
+      const gm = jogosNoBanco.find(x => x.id === id);
+      return `<div class="summary-row"><span>${gm.home} × ${gm.away}</span><span class="summary-pick ${cl[picks[id]]}">${lb[picks[id]]}</span></div>`;
+    }).join('') +
+    `<div class="summary-row"><span style="color:var(--muted);font-size:.8rem">${done.length}/${active.length} jogos</span>
+    <span style="color:${done.length===active.length?'var(--green)':'var(--gold)'};font-size:.8rem">${done.length===active.length?'✅ Completo':'⏳ Incompleto'}</span></div>`;
+}
+
+function confirmBet() {
+  const name = document.getElementById('bettor-name').value.trim();
+  const phone = document.getElementById('bettor-phone').value.trim();
+  if (!name) return toast('Digite seu nome!');
+  if (!phone) return toast('Digite seu WhatsApp!');
+  if (!jogosNoBanco.filter(g=>g.active).every(g=>picks[g.id])) return toast('Escolha todos os jogos!');
+  bettor = { name, phone, picks:{...picks}, timestamp:Date.now() };
+  document.getElementById('modal-amt').textContent = 'R$ ' + S.pix.amount;
+  document.getElementById('modal-key').textContent = S.pix.key || '— Configure no Admin —';
+  document.getElementById('modal-name').textContent = S.pix.name || 'BolãoPRO';
+  document.getElementById('pix-modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('pix-modal').classList.remove('open'); }
+
+function copyPix() {
+  const t = S.pix.key;
+  navigator.clipboard?.writeText(t).then(()=>toast('Chave copiada!')).catch(()=>{
+    const el=document.getElementById('modal-key');
+    const r=document.createRange(); r.selectNode(el);
+    window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+    document.execCommand('copy'); toast('Chave copiada!');
+  });
+}
+
+async function sendWA() {
+  if (!bettor) return;
+  
+  // Envia para o servidor Python usando a constante
+  try {
+    const response = await fetch(`${BACKEND_URL}/enviar-aposta`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+          nome: bettor.name,
+          whatsapp: bettor.phone,
+          palpites: bettor.picks // Envia os palpites certinho pro Pydantic
+      })
+    });
+    
+    if (response.ok) {
+      toast('Aposta salva no servidor!');
+    } else {
+        toast('Erro ao salvar no servidor.', true);
+    }
+  } catch (error) {
+    console.error("Erro ao salvar aposta:", error);
+  }
+
+  // Abre o WhatsApp
+  const active = jogosNoBanco.filter(g=>g.active);
+  const lb = {home:'Casa',draw:'Empate',away:'Fora'};
+  let msg = `🎯 *COMPROVANTE BOLÃO PRO*\n\n👤 *Nome:* ${bettor.name}\n📱 *WhatsApp:* ${bettor.phone}\n\n⚽ *PALPITES:*\n`;
+  active.forEach(g => { msg += `• ${g.home} × ${g.away}: *${lb[bettor.picks[g.id]]}*\n`; });
+  msg += `\n💸 *Valor:* R$ ${S.pix.amount}\n📎 _Segue o comprovante em anexo_`;
+  
+  window.open(`https://wa.me/${S.pix.whatsapp||'5511999999999'}?text=${encodeURIComponent(msg)}`, '_blank');
+  
+  closeModal();
+  picks = {};
+  document.getElementById('bettor-name').value = '';
+  document.getElementById('bettor-phone').value = '';
+  renderGames();
+}
+
+// ════════════════════════════════ RESULTS ════════════════════════════════
+function renderResults() {
+  const el = document.getElementById('results-list');
+  if (!jogosNoBanco.length) { el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">📊</div><p>Nenhum jogo cadastrado.</p></div>`; return; }
+  el.innerHTML = jogosNoBanco.map(g => {
+    const dt = g.datetime ? new Date(g.datetime).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    const has = g.result && g.result.home !== '' && g.result.away !== '';
+    const now = Date.now(), gtime = g.datetime ? new Date(g.datetime).getTime() : 0;
+    const status = has ? `<span class="result-status status-finished">✅ Encerrado</span>`
+      : now>=gtime && now<=gtime+7200000 ? `<span class="result-status status-live">🔴 Ao Vivo</span>`
+      : `<span class="result-status status-upcoming">⏰ Aguardando</span>`;
+    return `<div class="result-game">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem;flex-wrap:wrap;gap:.4rem">
+        ${status}<span style="font-size:.7rem;color:var(--muted)">${g.championship} · ${dt}</span>
+      </div>
+      <div class="result-teams">
+        <div class="team-name" style="text-align:right">${g.home}</div>
+        <div class="result-score">${has ? g.result.home+'×'+g.result.away : '?×?'}</div>
+        <div class="team-name" style="text-align:left">${g.away}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════ RANKING ════════════════════════════════
+function calcPts(bet) {
+  return S.games.reduce((acc,g) => {
+    if (!g.result || g.result.home==='' || g.result.away==='') return acc;
+    const p = bet.picks?.[g.id]; if (!p) return acc;
+    const h=+g.result.home, a=+g.result.away;
+    const actual = h>a?'home':h===a?'draw':'away';
+    return acc + (p===actual?1:0);
+  },0);
+}
+
+async function renderRanking() {
+  renderPrizes('ranking-prizes');
+  const el = document.getElementById('ranking-list');
+  
+  try {
+    // 1. Busca o ranking oficial e atualizado do seu backend Python
+    const response = await fetch(`${BACKEND_URL}/ranking-geral`);
+    const ranked = await response.json();
+
+    if (!ranked || !ranked.length) { 
+        el.innerHTML=`<div class="empty-state"><div class="empty-state-icon">🏆</div><p>Nenhuma aposta ainda. Seja o primeiro!</p></div>`; 
+        return; 
+    }
+
+    const pm={0:S.prizes.first,1:S.prizes.second,2:S.prizes.third};
+    const mm={0:'🥇',1:'🥈',2:'🥉'};
+    
+    // 2. Monta o HTML com os dados vindos do banco de dados
+    el.innerHTML = ranked.map((b,i)=>`
+      <div class="rank-item ${i<3?'rank-'+(i+1):''}">
+        <div class="rank-pos">${i+1}</div>
+        <div><div class="rank-name">${b.nome}</div><div class="rank-hits">${b.pontos} acerto${b.pontos!==1?'s':''}</div></div>
+        <div>
+          <div class="rank-points">${b.pontos}</div><div class="rank-pts-label">pontos</div>
+          ${i<3?`<div class="rank-prize">${mm[i]} ${pm[i]}</div>`:''}
+        </div>
+      </div>`).join('');
+      
+  } catch (error) {
+    console.error("Erro ao buscar ranking:", error);
+    el.innerHTML=`<div class="empty-state"><p>Erro ao carregar o ranking.</p></div>`;
+  }
+}
+
+// ════════════════════════════════ ADMIN ════════════════════════════════
+async function doLogin() {
+  const senhaDigitada = document.getElementById('admin-pw').value;
+  
+  try {
+    const response = await fetch(`${BACKEND_URL}/login-admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ senha: senhaDigitada })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      adminToken = data.token; // 🎯 Guardamos o token que o Python enviou!
+      
+      adminIn = true;
+      document.getElementById('admin-login-area').style.display='none';
+      document.getElementById('admin-content').style.display='block';
+      renderAdmin();
+      toast('Login efetuado com sucesso!');
+    } else {
+      toast('Senha incorreta!', true);
+    }
+  } catch (error) {
+    toast('Erro de conexão.', true);
+  }
+}
+
+function doLogout() {
+  adminIn=false;
+  document.getElementById('admin-login-area').style.display='block';
+  document.getElementById('admin-content').style.display='none';
+  document.getElementById('admin-pw').value='';
+}
+
+function renderAdmin() {
+  if (!adminIn) return;
+  document.getElementById('api-key-in').value = S.apiKey||'';
+  document.getElementById('pix-key').value = S.pix.key||'';
+  document.getElementById('pix-name').value = S.pix.name||'';
+  document.getElementById('bet-val').value = S.pix.amount?(S.pix.amount.replace(',','.')):'' ;
+  document.getElementById('admin-wa').value = S.pix.whatsapp||'';
+  document.getElementById('p1').value = S.prizes.first||'';
+  document.getElementById('p2').value = S.prizes.second||'';
+  document.getElementById('p3').value = S.prizes.third||'';
+  document.getElementById('pick-date').value = new Date().toISOString().split('T')[0];
+  refreshApiStatus();
+  renderAdminGames();
+  renderAdminResults();
+  document.getElementById('fetch-panel').style.display = S.apiKey ? 'block' : 'none';
+}
+
+function saveApiKey() {
+  S.apiKey = document.getElementById('api-key-in').value.trim();
+  save(); refreshApiStatus();
+  document.getElementById('fetch-panel').style.display = S.apiKey ? 'block' : 'none';
+  toast('API Key salva!');
+}
+
+function refreshApiStatus() {
+  const dot=document.getElementById('api-dot'), txt=document.getElementById('api-status-txt');
+  if (S.apiKey) { dot.className='dot ok'; txt.textContent='API Key configurada ✓'; }
+  else { dot.className='dot idle'; txt.textContent='Nenhuma API Key configurada'; }
+}
+
+// ──── API-FOOTBALL ────
+async function apiFetch(path) {
+  const r = await fetch('https://v3.football.api-sports.io' + path, {
+    headers: {'x-apisports-key': S.apiKey}
+  });
+  if (!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
+}
+
+async function doFetch(date) {
+  if (!S.apiKey) return toast('Configure a API Key primeiro!');
+  const statusEl=document.getElementById('fetch-status');
+  const fixturesEl=document.getElementById('fixtures-wrap');
+  const leagueEl=document.getElementById('league-wrap');
+  statusEl.style.display='flex';
+  document.getElementById('fetch-status-txt').textContent='Buscando jogos...';
+  fixturesEl.style.display='none'; leagueEl.style.display='none';
+  rawFixtures=[]; selIds=new Set();
+
+  try {
+    const data = await apiFetch(`/fixtures?date=${date}&timezone=America%2FSao_Paulo`);
+    statusEl.style.display='none';
+    if (data.errors?.key || data.errors?.token) return toast('API Key inválida!',true);
+    rawFixtures = data.response || [];
+    if (!rawFixtures.length) return toast('Nenhum jogo encontrado nessa data.');
+
+    // League filter
+    const leagues = [...new Map(rawFixtures.map(f=>[f.league.id, f.league])).values()];
+    document.getElementById('league-filter').innerHTML =
+      `<button class="lbtn on" onclick="setLeague('all',this)">Todas (${rawFixtures.length})</button>` +
+      leagues.map(l=>`<button class="lbtn" onclick="setLeague(${l.id},this)">${l.name} (${rawFixtures.filter(f=>f.league.id===l.id).length})</button>`).join('');
+    leagueEl.style.display='block';
+    leagueFilter='all';
+    renderFixtures();
+    fixturesEl.style.display='block';
+  } catch(e) {
+    statusEl.style.display='none';
+    toast('Erro: '+e.message, true);
+  }
+}
+
+function fetchToday() { doFetch(new Date().toISOString().split('T')[0]); }
+function fetchByDate() {
+  const d=document.getElementById('pick-date').value;
+  if (!d) return toast('Selecione uma data!');
+  doFetch(d);
+}
+
+function setLeague(id, btn) {
+  leagueFilter=id;
+  document.querySelectorAll('.lbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderFixtures();
+}
+
+function renderFixtures() {
+  const filtered = leagueFilter==='all' ? rawFixtures : rawFixtures.filter(f=>f.league.id==leagueFilter);
+  document.getElementById('fix-count').textContent = filtered.length;
+  document.getElementById('fix-sel').textContent = selIds.size;
+  document.getElementById('add-fix-btn').style.display = selIds.size ? 'inline-block' : 'none';
+
+  document.getElementById('fixture-list').innerHTML = filtered.map(f => {
+    const sel=selIds.has(f.fixture.id);
+    const already=!!S.games.find(g=>g.apiId===f.fixture.id);
+    const kt=new Date(f.fixture.date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="fixture-item ${sel?'sel':''} ${already?'added':''}" onclick="${already?'':('toggleFix('+f.fixture.id+')')}">
+      <div class="fixture-check">${sel?'✓':''}</div>
+      <div class="fixture-champ">${f.league.name}</div>
+      <div class="fixture-teams">${f.teams.home.name} × ${f.teams.away.name}</div>
+      <div class="fixture-time">${kt}${already?' <span style="color:var(--green);font-size:.6rem">✓ no bolão</span>':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleFix(id) {
+  selIds.has(id) ? selIds.delete(id) : selIds.add(id);
+  renderFixtures();
+}
+
+// Substitui a sua função addSelected atual [cite: 24, 27]
+async function addSelected() {
+  let n = 0;
+  
+  for (const fid of selIds) {
+    const f = rawFixtures.find(x => x.fixture.id === fid);
+    if (!f) continue;
+    
+    // Envia o jogo para o Python salvar
+    await fetch(`${BACKEND_URL}/adicionar-jogo`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-admin-token': adminToken // O crachá de segurança!
+      },
+      body: JSON.stringify({
+        apiId: fid,
+        home: f.teams.home.name,
+        away: f.teams.away.name,
+        championship: f.league.name,
+        datetime: f.fixture.date
+      })
+    });
+    n++;
+  }
+  
+  selIds = new Set();
+  toast(`${n} jogo(s) adicionado(s)!`);
+  carregarJogosDoBanco(); // Recarrega a lista oficial
+  renderFixtures();
+}
+
+// ──── ADMIN GAMES ────
+function renderAdminGames() {
+  document.getElementById('admin-games-list').innerHTML = jogosNoBanco.map(g=>`
+    <div class="admin-game-row">
+      <input class="admin-input" value="${g.home}" disabled placeholder="Casa">
+      <input class="admin-input" value="${g.away}" disabled placeholder="Fora">
+      <input class="admin-input" value="${g.championship}" disabled placeholder="Campeonato">
+      <input class="admin-input" type="datetime-local" value="${(g.datetime||'').slice(0,16)}" disabled style="font-size:.7rem">
+      <button class="toggle-btn ${g.active?'on':''}" onclick="togGame('${g.id}')">${g.active?'Ativo':'Inativo'}</button>
+      <button class="del-btn" onclick="delGame('${g.id}')">🗑</button>
+    </div>`).join('');
+}
+
+function renderAdminResults() {
+  const el=document.getElementById('admin-results-list');
+  if (!S.games.length) { el.innerHTML='<p style="color:var(--muted);font-size:.85rem">Nenhum jogo.</p>'; return; }
+  el.innerHTML = S.games.map(g => {
+    const r=g.result||{home:'',away:''};
+    return `<div class="result-row">
+      <span style="font-size:.82rem">${g.home} × ${g.away}</span>
+      <input class="admin-input" type="number" min="0" placeholder="Casa" value="${r.home}" onchange="updRes(${g.id},'home',this.value)" style="text-align:center">
+      <span style="text-align:center;color:var(--muted)">×</span>
+      <input class="admin-input" type="number" min="0" placeholder="Fora" value="${r.away}" onchange="updRes(${g.id},'away',this.value)" style="text-align:center">
+      <button class="toggle-btn" onclick="saveRes(${g.id})">💾 Salvar</button>
+    </div>`;
+  }).join('');
+}
+
+function upd(id,f,v){const g=S.games.find(x=>x.id===id);if(g){g[f]=v;save();}}
+async function togGame(id) {
+  const g = jogosNoBanco.find(x => x.id === id);
+  if(!g) return;
+  try {
+      await fetch(`${BACKEND_URL}/alternar-status-jogo/${id}?ativo=${!g.active}`, {
+          method: 'PUT',
+          headers: { 'x-admin-token': adminToken }
+      });
+      carregarJogosDoBanco();
+      toast('Status alterado!');
+  } catch(e) {
+      toast('Erro ao alterar status', true);
+  }
+}
+// Substitui a sua delGame atual [cite: 27]
+async function delGame(id) {
+  if (!confirm('Tem certeza que deseja excluir este jogo?')) return;
+  
+  await fetch(`${BACKEND_URL}/remover-jogo/${id}`, {
+    method: 'DELETE',
+    headers: { 'x-admin-token': adminToken }
+  });
+  
+  toast('Jogo removido!');
+  carregarJogosDoBanco();
+}
+function addManual(){S.games.push({id:S.nextId++,home:'Time A',away:'Time B',championship:'Campeonato',datetime:'',active:true,result:null});save();renderAdminGames();renderAdminResults();}
+function updRes(id,s,v){const g=S.games.find(x=>x.id===id);if(!g)return;if(!g.result)g.result={home:'',away:''};g.result[s]=v;}
+function saveRes(id){save();toast('Resultado salvo!');}
+
+async function syncResults() {
+  if (!S.apiKey) return toast('Configure a API Key!');
+  const btn=document.getElementById('sync-btn');
+  btn.disabled=true; btn.textContent='⏳ Sincronizando...';
+  let n=0;
+  for (const g of S.games) {
+    if (!g.apiId) continue;
+    try {
+      const data = await apiFetch('/fixtures?id='+g.apiId);
+      const f=data.response?.[0]; if (!f) continue;
+      const done=['FT','AET','PEN','WO'].includes(f.fixture.status.short);
+      if (done && f.goals.home!=null && f.goals.away!=null) {
+        g.result={home:String(f.goals.home), away:String(f.goals.away)}; n++;
+      }
+    } catch(e){/* skip */}
+  }
+  save(); renderAdminResults();
+  btn.disabled=false; btn.textContent='🔄 SINCRONIZAR VIA API';
+  toast(`${n} resultado${n!==1?'s':''} sincronizado${n!==1?'s':''}!`);
+}
+
+function saveSettings() {
+  const amt=parseFloat(document.getElementById('bet-val').value)||15;
+  S.pix.key=document.getElementById('pix-key').value;
+  S.pix.name=document.getElementById('pix-name').value;
+  S.pix.amount=amt.toFixed(2).replace('.',',');
+  S.pix.whatsapp=document.getElementById('admin-wa').value;
+  S.prizes.first=document.getElementById('p1').value;
+  S.prizes.second=document.getElementById('p2').value;
+  S.prizes.third=document.getElementById('p3').value;
+  save(); toast('Configurações salvas!');
+}
+async function carregarJogosDoBanco() {
+  try {
+    const response = await fetch(`${BACKEND_URL}/jogos`);
+    jogosNoBanco = await response.json();
+    
+    // Atualiza as telas com os dados reais
+    renderGames(); // Tela principal de apostas
+    renderAdminGames(); // Painel do admin
+  } catch (error) {
+    console.error("Erro ao carregar jogos:", error);
+  }
+}
+// ════════════════════════════════ UTILS ════════════════════════════════
+function toast(msg, isErr=false) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast'+(isErr?' err':'');
+  void t.offsetWidth; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// auto-refresh
+setInterval(()=>{
+  if(document.getElementById('page-resultados').classList.contains('active')) renderResults();
+  if(document.getElementById('page-ranking').classList.contains('active')) renderRanking();
+},60000);
+
+// boot
+renderGames();
+
+
+// Chame essa função logo que o site carregar (no final do seu script)
+carregarJogosDoBanco();
+</script>
+</body>
+</html>
