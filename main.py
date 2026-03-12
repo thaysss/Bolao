@@ -68,13 +68,15 @@ def verificar_admin(x_admin_token: str = Header(...)):
     """Verifica se o token enviado no cabeçalho bate com a senha do sistema"""
     if x_admin_token != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Crachá inválido! Acesso negado.")
-    
+
+
+app = FastAPI() 
 # ---------------- ENDPOINTS (ROTAS DA API) ----------------
 @app.get("/")
 async def pagina_inicial():
     """Quando alguém acessar o link do Railway, o Python entrega o site visual"""
     return FileResponse("index.html")
-    
+
 @app.get("/jogos-hoje")
 async def buscar_jogos(data: str = None):
     """Busca jogos na API de Futebol e retorna ao frontend (Veio do seu banco.py)"""
