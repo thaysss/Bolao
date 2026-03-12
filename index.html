@@ -878,7 +878,7 @@ async function carregarConfiguracoes() {
     const configBanco = await response.json();
     
     if (configBanco && configBanco.pix_key) {
-      // Atualiza a variável S com os dados oficias do banco
+      // 🎯 Atualiza a variável GLOBAL S para que o modal PIX use os dados certos
       S.pix.key = configBanco.pix_key;
       S.pix.name = configBanco.pix_name;
       S.pix.amount = configBanco.pix_amount;
@@ -887,25 +887,28 @@ async function carregarConfiguracoes() {
       S.prizes.second = configBanco.prize_2;
       S.prizes.third = configBanco.prize_3;
       
-      // Atualiza os prêmios na tela de Ranking se ela estiver aberta
-      if(document.getElementById('page-ranking').classList.contains('active')) {
-          renderRanking();
+      // Preenche os campos do admin se estiverem vazios
+      if(adminIn) {
+          document.getElementById('pix-key').value = S.pix.key;
+          document.getElementById('pix-name').value = S.pix.name;
+          document.getElementById('bet-val').value = S.pix.amount.replace(',','.');
       }
+      renderPrizes('prize-banner');
     }
   } catch (error) {
-    console.error("Erro ao carregar configurações:", error);
+    console.error("Erro ao carregar configs:", error);
   }
 }
 
 async function carregarJogosDoBanco() {
   try {
     const response = await fetch(`${BACKEND_URL}/jogos`);
-    jogosNoBanco = await response.json();
+    const dados = await response.json();
     
-    renderGames(); 
-    if(adminIn) {
-      renderAdminGames(); 
-      renderAdminResults();
+    if (dados) {
+        jogosNoBanco = dados; // 🎯 Atualiza a lista global
+        renderGames(); // Desenha na tela
+        if(adminIn) renderAdminGames();
     }
   } catch (error) {
     console.error("Erro ao carregar jogos:", error);

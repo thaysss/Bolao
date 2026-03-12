@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
-from typing import Dict
+from typing import Dict, List, Optional
 from datetime import datetime
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +9,10 @@ import os
 from supabase import create_client, Client
 import asyncio
 
+# 1. Instância Única do App
 app = FastAPI()
+
+# 2. Configuração de CORS (Essencial para o site funcionar)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,25 +22,24 @@ app.add_middleware(
 )
 
 # ---------------- CONFIGURAÇÕES E CHAVES ----------------
-
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://brbjlpcpiubtlneualrv.supabase.co") # A URL não é secreta, pode deixar
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://brbjlpcpiubtlneualrv.supabase.co")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "") 
 FOOTBALL_API_KEY = os.getenv("FOOTBALL_API_KEY", "")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123") # admin123 fica só como um padrão provisório de teste
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 # ---------------- MODELOS DE DADOS ----------------
 class Aposta(BaseModel):
     nome: str
     whatsapp: str
     palpites: Dict[str, str]
 
-
 class LoginRequest(BaseModel):
     senha: str
 
 class NovoJogo(BaseModel):
-    apiId: int = None
+    apiId: Optional[int] = None
     home: str
     away: str
     championship: str
@@ -51,7 +53,6 @@ class Configuracoes(BaseModel):
     prize_1: str
     prize_2: str
     prize_3: str
-
 
 # ---------------- FUNÇÕES DE APOIO ----------------
 def calcular_ranking(jogos_oficiais, todas_apostas):
@@ -67,11 +68,13 @@ def calcular_ranking(jogos_oficiais, todas_apostas):
             if not resultado_oficial or resultado_oficial.get("home") == "":
                 continue
                 
-            h, a = int(resultado_oficial["home"]), int(resultado_oficial["away"])
-            vencedor_real = "home" if h > a else "away" if a > h else "draw"
-            
-            if palpites.get(jogo_id) == vencedor_real:
-                pontos += 1
+            try:
+                h, a = int(resultado_oficial["home"]), int(resultado_oficial["away"])
+                vencedor_real = "home" if h > a else "away" if a > h else "draw"
+                
+                if palpites.get(jogo_id) == vencedor_real:
+                    pontos += 1
+            except: continue
         
         ranking.append({
             "nome": aposta["nome"],
@@ -81,22 +84,20 @@ def calcular_ranking(jogos_oficiais, todas_apostas):
     
     return sorted(ranking, key=lambda x: x["pontos"], reverse=True)
 
-def verificar_admin(x_admin_token: str = Header(...)):
+def verificar_admin(x_admin_token: str = Header(None)):
     """Verifica se o token enviado no cabeçalho bate com a senha do sistema"""
-    if x_admin_token != ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Crachá inválido! Acesso negado.")
+    if not x_admin_token or x_admin_token != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Acesso negado. Token inválido.")
 
-
-app = FastAPI() 
 # ---------------- ENDPOINTS (ROTAS DA API) ----------------
+
 @app.get("/")
 async def pagina_inicial():
-    """Quando alguém acessar o link do Railway, o Python entrega o site visual"""
+    """Entrega o site visual (index.html deve estar na mesma pasta)"""
     return FileResponse("index.html")
 
 @app.get("/jogos-hoje")
 async def buscar_jogos(data: str = None):
-    """Busca jogos na API de Futebol e retorna ao frontend (Veio do seu banco.py)"""
     if not data:
         data = datetime.now().strftime("%Y-%m-%d")
         
@@ -107,158 +108,90 @@ async def buscar_jogos(data: str = None):
         response = await client.get(url, headers=headers)
         return response.json()
 
+@app.get("/jogos")
+async def listar_jogos():
+    """Puxa os jogos salvos no banco para o frontend exibir"""
+    res = supabase.table("jogos").select("*").order("datetime").execute()
+    return res.data
+
 @app.post("/salvar-aposta")
 async def salvar_aposta(aposta: Aposta):
     try:
-        # O model_dump() garante que os dados vãos no formato que o Supabase entende
-        dados = {
-            "nome": aposta.nome,
-            "whatsapp": aposta.whatsapp,
-            "palpites": aposta.palpites
-        }
-        res = supabase.table("apostas").insert(dados).execute()
+        dados = aposta.model_dump()
+        supabase.table("apostas").insert(dados).execute()
         return {"status": "sucesso"}
     except Exception as e:
-        # Isso vai mostrar o erro exato lá na tela preta do Railway para você
         print(f"ERRO CRÍTICO NO BANCO: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/ranking-geral")
 async def obter_ranking_geral():
-    """Gera o ranking atualizado consultando o Supabase"""
     jogos = supabase.table("jogos").select("*").execute().data
     apostas = supabase.table("apostas").select("*").execute().data
-    
     return calcular_ranking(jogos, apostas)
 
-# ---------------- TAREFAS EM SEGUNDO PLANO ----------------
-
-import asyncio # Adicione isso lá no topo do main.py junto com os outros imports
-
-# ---------------- TAREFAS EM SEGUNDO PLANO (ATUALIZADO) ----------------
-
-@app.on_event("startup")
-async def iniciar_automacoes():
-    """Esta função roda assim que o servidor liga no Railway"""
-    # Dispara a função de sincronização para rodar no fundo
-    asyncio.create_task(sincronizar_resultados_automatico())
-
-async def sincronizar_resultados_automatico():
-    """Loop infinito que atualiza os placares e dorme por 1 hora"""
-    while True:
-        try:
-            jogos_pendentes = supabase.table("jogos").select("id, apiId").filter("result", "is", "null").execute().data
-            
-            if jogos_pendentes:
-                async with httpx.AsyncClient() as client:
-                    headers = {"x-apisports-key": FOOTBALL_API_KEY}
-                    
-                    for jogo in jogos_pendentes:
-                        api_id = jogo.get("apiId")
-                        if not api_id:
-                            continue
-                            
-                        # Busca o resultado na API
-                        response = await client.get(f"https://v3.football.api-sports.io/fixtures?id={api_id}", headers=headers)
-                        dados = response.json()
-                        
-                        if dados.get("response"):
-                            fixture = dados["response"][0]
-                            status = fixture["fixture"]["status"]["short"]
-                            
-                            if status in ["FT", "AET", "PEN"]:
-                                gols_casa = fixture["goals"]["home"]
-                                gols_fora = fixture["goals"]["away"]
-                                
-                                supabase.table("jogos").update({
-                                    "result": {"home": str(gols_casa), "away": str(gols_fora)}
-                                }).eq("id", jogo["id"]).execute()
-                                
-            print("Sincronização de resultados finalizada com sucesso.")
-        except Exception as e:
-            print(f"Erro na sincronização: {e}")
-        
-        # O servidor 'dorme' nessa tarefa por 1 hora (3600 segundos) antes de repetir
-        await asyncio.sleep(3600)
-
-
+# ---------------- ROTAS ADMIN ----------------
 
 @app.post("/login-admin")
 async def login_admin(req: LoginRequest):
     if req.senha == ADMIN_PASSWORD:
-        # Se acertar a senha, devolvemos a própria senha para servir como 'Token' no Frontend
         return {"status": "sucesso", "token": ADMIN_PASSWORD}
     raise HTTPException(status_code=401, detail="Senha incorreta")
 
-
-@app.post("/salvar-resultado", dependencies=[Depends(verificar_admin)])
-async def salvar_resultado(jogo_id: int, gols_casa: int, gols_fora: int):
-    # O Python SÓ chega nessa linha se o token estiver correto
-    try:
-        supabase.table("jogos").update({
-            "result": {"home": str(gols_casa), "away": str(gols_fora)}
-        }).eq("id", jogo_id).execute()
-        return {"status": "sucesso"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
-
-# ---------------- ROTAS PÚBLICAS ----------------
-
-@app.get("/jogos")
-async def listar_jogos():
-    """Retorna todos os jogos cadastrados no banco para o frontend exibir"""
-    res = supabase.table("jogos").select("*").order("datetime").execute()
-    return res.data
-
+@app.get("/obter-api-key", dependencies=[Depends(verificar_admin)])
+async def obter_api_key():
+    return {"api_key": FOOTBALL_API_KEY}
 
 @app.post("/adicionar-jogo", dependencies=[Depends(verificar_admin)])
 async def adicionar_jogo(jogo: NovoJogo):
-    """Admin adiciona um novo jogo ao bolão"""
     try:
-        res = supabase.table("jogos").insert(jogo.model_dump()).execute()
-        return {"status": "sucesso", "data": res.data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/remover-jogo/{jogo_id}", dependencies=[Depends(verificar_admin)])
-async def remover_jogo(jogo_id: str):
-    """Admin remove um jogo do bolão"""
-    try:
-        supabase.table("jogos").delete().eq("id", jogo_id).execute()
+        supabase.table("jogos").insert(jogo.model_dump()).execute()
         return {"status": "sucesso"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.put("/alternar-status-jogo/{jogo_id}", dependencies=[Depends(verificar_admin)])
-async def alternar_status_jogo(jogo_id: str, ativo: bool):
-    """Admin pausa ou ativa um jogo (ex: fecha as apostas quando o jogo começa)"""
-    try:
-        supabase.table("jogos").update({"active": ativo}).eq("id", jogo_id).execute()
-        return {"status": "sucesso"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/configuracoes")
 async def obter_configuracoes():
-    """Puxa as configurações do banco para todo mundo que abrir o site"""
     res = supabase.table("configuracoes").select("*").eq("id", 1).execute()
-    if res.data:
-        return res.data[0]
-    return {}
+    return res.data[0] if res.data else {}
 
 @app.post("/salvar-configuracoes", dependencies=[Depends(verificar_admin)])
 async def atualizar_configuracoes(config: Configuracoes):
-    """Admin salva as configurações novas no banco"""
     try:
         supabase.table("configuracoes").update(config.model_dump()).eq("id", 1).execute()
         return {"status": "sucesso"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ---------------- TAREFAS EM SEGUNDO PLANO ----------------
 
-@app.get("/obter-api-key", dependencies=[Depends(verificar_admin)])
-async def obter_api_key():
-    """Devolve a chave da API-Football salva no Railway para o painel Admin"""
-    return {"api_key": FOOTBALL_API_KEY}
+@app.on_event("startup")
+async def iniciar_automacoes():
+    asyncio.create_task(sincronizar_resultados_automatico())
+
+async def sincronizar_resultados_automatico():
+    while True:
+        try:
+            jogos_pendentes = supabase.table("jogos").select("id, apiId").filter("result", "is", "null").execute().data
+            if jogos_pendentes:
+                async with httpx.AsyncClient() as client:
+                    headers = {"x-apisports-key": FOOTBALL_API_KEY}
+                    for jogo in jogos_pendentes:
+                        api_id = jogo.get("apiId")
+                        if not api_id: continue
+                        
+                        response = await client.get(f"https://v3.football.api-sports.io/fixtures?id={api_id}", headers=headers)
+                        dados = response.json()
+                        
+                        if dados.get("response"):
+                            fixture = dados["response"][0]
+                            status = fixture["fixture"]["status"]["short"]
+                            if status in ["FT", "AET", "PEN"]:
+                                gols = fixture["goals"]
+                                supabase.table("jogos").update({
+                                    "result": {"home": str(gols["home"]), "away": str(gols["away"])}
+                                }).eq("id", jogo["id"]).execute()
+            print("Sincronização finalizada.")
+        except Exception as e:
+            print(f"Erro na sincronização: {e}")
+        await asyncio.sleep(3600)
