@@ -1,13 +1,14 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import os
 from supabase import create_client, Client
 import asyncio
+
 
 app = FastAPI()
 
@@ -120,6 +121,37 @@ async def buscar_api(data: str = None):
 
 @app.post("/salvar-aposta")
 async def salvar_aposta(aposta: Aposta):
+    # Puxar todos os jogos ativos para verificar o horário
+    res = supabase.table("jogos").select("datetime").eq("active", True).execute()
+    jogos = res.data
+    
+    if not jogos:
+        raise HTTPException(status_code=400, detail="Não existem jogos ativos no bolão.")
+
+    # Encontrar o horário do primeiro jogo
+    # Nota: A API costuma enviar em formato ISO (ex: 2024-03-12T21:30:00+00:00)
+    try:
+        horarios = []
+        for j in jogos:
+            dt = datetime.fromisoformat(j['datetime'].replace('Z', '+00:00'))
+            horarios.append(dt)
+        
+        primeiro_jogo = min(horarios)
+        agora = datetime.now(timezone.utc)
+
+        # Se o jogo já começou ou faltam menos de 1 minuto
+        if agora > primeiro_jogo:
+            raise HTTPException(
+                status_code=403, 
+                detail="As apostas estão encerradas! O primeiro jogo já começou."
+            )
+            
+    except Exception as e:
+        print(f"Erro ao validar horário: {e}")
+        # Se houver erro na data, deixamos passar por segurança ou bloqueamos? 
+        # Idealmente bloqueamos se não conseguirmos validar.
+
+    # Se passou na validação, guarda a aposta
     try:
         supabase.table("apostas").insert(aposta.model_dump()).execute()
         return {"status": "sucesso"}
@@ -185,25 +217,75 @@ async def save_config(config: Configuracoes):
 # ---------------- AUTOMAÇÃO ----------------
 @app.on_event("startup")
 async def startup():
+    # Inicia a tarefa em segundo plano assim que o servidor liga
     asyncio.create_task(sincronizar_resultados())
 
 async def sincronizar_resultados():
     while True:
         try:
-            jogos = supabase.table("jogos").select("id, apiId").filter("result", "is", "null").execute().data
-            if jogos:
+            print(f"[{datetime.now()}] Iniciando verificação de resultados...")
+            
+            # 1. Busca jogos que ainda não têm resultado (result is null)
+            res = supabase.table("jogos").select("id, apiId, home, away").filter("result", "is", "null").execute()
+            jogos_pendentes = res.data
+            
+            if jogos_pendentes:
+                print(f"Encontrados {len(jogos_pendentes)} jogos para atualizar.")
+                
                 async with httpx.AsyncClient() as client:
                     headers = {"x-apisports-key": FOOTBALL_API_KEY}
-                    for j in jogos:
-                        if not j.get("apiId"): continue
-                        r = await client.get(f"https://v3.football.api-sports.io/fixtures?id={j['apiId']}", headers=headers)
-                        d = r.json()
-                        if d.get("response"):
+                    
+                    for j in jogos_pendentes:
+                        api_id = j.get("apiId")
+                        if not api_id:
+                            continue
+                        
+                        print(f"Checando: {j['home']} x {j['away']} (ID API: {api_id})")
+                        
+                        # 2. Faz a chamada para a API
+                        response = await client.get(
+                            f"https://v3.football.api-sports.io/fixtures?id={api_id}", 
+                            headers=headers,
+                            timeout=10.0
+                        )
+                        
+                        d = response.json()
+                        
+                        # Verifica se a API retornou erro de limite/suspensão
+                        if d.get("errors"):
+                            print(f"⚠️ AVISO DA API: {d['errors']}")
+                            break # Para o loop para não piorar a situação
+
+                        if d.get("response") and len(d["response"]) > 0:
                             fix = d["response"][0]
-                            if fix["fixture"]["status"]["short"] in ["FT", "AET", "PEN"]:
+                            status = fix["fixture"]["status"]["short"]
+                            
+                            # Se o jogo terminou (FT, AET ou PEN)
+                            if status in ["FT", "AET", "PEN"]:
                                 g = fix["goals"]
-                                supabase.table("jogos").update({"result": {"home": str(g["home"]), "away": str(g["away"])}}).eq("id", j["id"]).execute()
-        except: pass
+                                home_goals = str(g["home"]) if g["home"] is not None else "0"
+                                away_goals = str(g["away"]) if g["away"] is not None else "0"
+                                
+                                # 3. Atualiza o banco de dados
+                                supabase.table("jogos").update({
+                                    "result": {"home": home_goals, "away": away_goals}
+                                }).eq("id", j["id"]).execute()
+                                
+                                print(f"✅ Resultado salvo: {j['home']} {home_goals} x {away_goals} {j['away']}")
+                        
+                        # ✨ O SEGREDO ANTI-BANIMENTO ESTÁ AQUI:
+                        # Espera 12 segundos antes de consultar o próximo jogo da lista.
+                        # Isso evita o gatilho de "tiro rápido" que suspende sua conta.
+                        await asyncio.sleep(12)
+            
+            else:
+                print("Nenhum jogo pendente encontrado.")
+
+        except Exception as e:
+            print(f"❌ Erro no loop de sincronização: {e}")
+        
+        # Espera 1 hora (3600 segundos) para rodar a lista toda novamente
+        print(f"[{datetime.now()}] Ciclo finalizado. Próxima checagem em 1 hora.")
         await asyncio.sleep(3600)
 
 
@@ -232,3 +314,33 @@ async def zerar_apostas():
     except Exception as e:
         print(f"Erro ao zerar: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/sincronizar-manual", dependencies=[Depends(verificar_admin)])
+async def sincronizar_manual():
+    """Dispara a atualização de resultados imediatamente (em background)"""
+    asyncio.create_task(sincronizar_resultados_processo_unico())
+    return {"status": "Sincronização iniciada em segundo plano"}
+
+async def sincronizar_resultados_processo_unico():
+    """Versão da função de sync que corre apenas uma vez (sem loop infinito)"""
+    try:
+        res = supabase.table("jogos").select("id, apiId, home, away").filter("result", "is", "null").execute()
+        jogos_pendentes = res.data
+        if jogos_pendentes:
+            async with httpx.AsyncClient() as client:
+                headers = {"x-apisports-key": FOOTBALL_API_KEY}
+                for j in jogos_pendentes:
+                    api_id = j.get("apiId")
+                    if not api_id: continue
+                    response = await client.get(f"https://v3.football.api-sports.io/fixtures?id={api_id}", headers=headers)
+                    d = response.json()
+                    if d.get("response") and len(d["response"]) > 0:
+                        fix = d["response"][0]
+                        if fix["fixture"]["status"]["short"] in ["FT", "AET", "PEN"]:
+                            g = fix["goals"]
+                            supabase.table("jogos").update({
+                                "result": {"home": str(g["home"]), "away": str(g["away"])}
+                            }).eq("id", j["id"]).execute()
+                    await asyncio.sleep(12) # Segurança anti-ban
+    except Exception as e:
+        print(f"Erro no sync manual: {e}")

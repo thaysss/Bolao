@@ -303,6 +303,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 
       <div class="admin-panel">
         <div class="admin-section-title">📊 Resultados</div>
+        <button class="btn-primary" style="margin-bottom: 1rem; background: var(--blue)" onclick="syncManual()"></button>
+            🔄 ATUALIZAR RESULTADOS AGORA (MANUAL)
+        </button>
         <div id="admin-results-list"></div>
       </div>
 
@@ -427,12 +430,51 @@ function renderGames() {
   renderPrizes('prize-banner');
   const active = jogosNoBanco.filter(g => g.active); 
   const g = document.getElementById('games-grid');
+  const sum = document.getElementById('bet-summary');
+  const frm = document.getElementById('bettor-form');
+
   if (!active.length) {
     g.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚽</div><p>Nenhum jogo disponível.<br>Aguarde o administrador configurar o bolão.</p></div>`;
-    document.getElementById('bet-summary').style.display = 'none';
-    document.getElementById('bettor-form').style.display = 'none';
+    sum.style.display = 'none';
+    frm.style.display = 'none';
     return;
   }
+
+  // --- LÓGICA DE BLOQUEIO POR HORÁRIO ---
+  const agora = new Date();
+  
+  // Extraímos apenas os horários válidos e encontramos o mais cedo
+  const horarios = active
+    .filter(j => j.datetime)
+    .map(j => new Date(j.datetime));
+  
+  if (horarios.length > 0) {
+    const primeiroJogo = new Date(Math.min(...horarios));
+
+    // Se o horário atual passou do horário do primeiro jogo
+    if (agora > primeiroJogo) {
+      g.innerHTML = `
+        <div class="admin-panel" style="border-color: var(--red); text-align: center; padding: 2rem; background: rgba(255,23,68,0.05)">
+            <div style="font-size: 3rem; margin-bottom: 1rem">🔒</div>
+            <div class="section-title" style="color: var(--red); margin-bottom: 0.5rem">APOSTAS ENCERRADAS</div>
+            <p style="color: var(--muted); font-size: 0.9rem">
+                O bolão fechou automaticamente às <b>${primeiroJogo.toLocaleString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</b> 
+                do dia ${primeiroJogo.toLocaleDateString('pt-BR')}, pois o primeiro jogo já iniciou.
+            </p>
+            <button class="btn-secondary" style="margin-top: 1.5rem; width: auto; padding: 0.6rem 2rem" 
+                    onclick="goPage('resultados', document.querySelectorAll('.nav-tab')[1])">
+                📊 VER RESULTADOS AO VIVO
+            </button>
+        </div>
+      `;
+      sum.style.display = 'none';
+      frm.style.display = 'none';
+      return; // Interrompe a função aqui para não mostrar os jogos para apostar
+    }
+  }
+  // --- FIM DA LÓGICA DE BLOQUEIO ---
+
+  // Renderização normal dos jogos se ainda não começou
   g.innerHTML = active.map(({id, home, away, championship, datetime}) => {
     const p = picks[id];
     const dt = datetime ? new Date(datetime).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
@@ -450,6 +492,7 @@ function renderGames() {
       </div>
     </div>`;
   }).join('');
+  
   updateSummary();
 }
 
@@ -970,6 +1013,33 @@ async function togglePagamento(id, novoStatus) {
     toast(novoStatus ? 'Pagamento aprovado!' : 'Aposta desativada');
     carregarApostasAdmin(); // Recarrega a lista
   } catch (e) { toast('Erro ao atualizar', true); }
+}
+
+// --- FUNÇÃO PARA SINCRONIZAR MANUALMENTE ---
+async function syncManual() {
+    const btn = event.target;
+    const originalText = btn.innerText;
+    btn.innerText = "⏳ A ATUALIZAR... (PODE DEMORAR)";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`${BACKEND_URL}/admin/sincronizar-manual`, {
+            method: 'POST',
+            headers: { 'x-admin-token': adminToken }
+        });
+        if (res.ok) {
+            toast("Sincronização iniciada! Aguarde alguns minutos e atualize a página.");
+        } else {
+            toast("Erro ao iniciar sincronização.", true);
+        }
+    } catch (e) {
+        toast("Erro de ligação.", true);
+    } finally {
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }, 5000);
+    }
 }
 
 // auto-refresh
