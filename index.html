@@ -303,8 +303,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 
       <div class="admin-panel">
         <div class="admin-section-title">📊 Resultados</div>
-        <button class="btn-primary" style="margin-bottom: 1rem; background: var(--blue)" onclick="syncManual()"></button>
-            🔄 ATUALIZAR RESULTADOS AGORA (MANUAL)
+        <button class="btn-primary" style="margin-bottom: 1rem; background: var(--blue)" onclick="syncManual(this)">
+          🔄 ATUALIZAR RESULTADOS AGORA (MANUAL)
         </button>
         <div id="admin-results-list"></div>
       </div>
@@ -1016,8 +1016,7 @@ async function togglePagamento(id, novoStatus) {
 }
 
 // --- FUNÇÃO PARA SINCRONIZAR MANUALMENTE ---
-async function syncManual() {
-    const btn = event.target;
+async function syncManual(btn) {
     const originalText = btn.innerText;
     btn.innerText = "⏳ A ATUALIZAR... (PODE DEMORAR)";
     btn.disabled = true;
