@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import Dict, List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import os
@@ -59,41 +60,62 @@ def verificar_admin(x_admin_token: str = Header(None)):
 
 def calcular_ranking(jogos_oficiais, todas_apostas):
     ranking = []
-    
+    jogos_por_id = {str(j.get("id")): j for j in jogos_oficiais}
+
     for aposta in todas_apostas:
         pontos = 0
         palpites = aposta.get("palpites", {})
-        
+        jogos_realizados = []
+
         for jogo in jogos_oficiais:
             jogo_id = str(jogo["id"])
             resultado_real = jogo.get("result") # Ex: {"home": "2", "away": "1"}
-            
-            # Pula o jogo se ele ainda não tiver resultado oficial
-            if not resultado_real or resultado_real.get("home") is None or resultado_real.get("home") == "":
-                continue
-            
+
             try:
+                meu_palpite = palpites.get(jogo_id)
+                if meu_palpite:
+                    jogos_realizados.append({
+                        "jogo_id": jogo_id,
+                        "home": jogo.get("home"),
+                        "away": jogo.get("away"),
+                        "palpite": meu_palpite
+                    })
+
+                # Pula o jogo se ele ainda não tiver resultado oficial
+                if not resultado_real or resultado_real.get("home") is None or resultado_real.get("home") == "":
+                    continue
+
                 # 1. Descobre quem ganhou na vida real
                 gols_h = int(resultado_real["home"])
                 gols_a = int(resultado_real["away"])
                 vencedor_real = "home" if gols_h > gols_a else "away" if gols_a > gols_h else "draw"
-                
+
                 # 2. Compara com o palpite do usuário para esse jogo específico
-                meu_palpite = palpites.get(jogo_id)
-                
                 if meu_palpite == vencedor_real:
                     pontos += 1
             except Exception as e:
                 print(f"Erro ao processar pontos do jogo {jogo_id}: {e}")
                 continue
-        
+
+        # Inclui também palpites de jogos que não estão na lista oficial atual
+        for jogo_id, palpite in (palpites or {}).items():
+            if jogo_id in jogos_por_id:
+                continue
+            jogos_realizados.append({
+                "jogo_id": jogo_id,
+                "home": f"Jogo #{jogo_id}",
+                "away": "(não encontrado)",
+                "palpite": palpite
+            })
+
         # Adiciona o resumo desse apostador na lista
         ranking.append({
             "nome": aposta.get("nome", "Anônimo"),
             "pontos": pontos,
-            "whatsapp": aposta.get("whatsapp", "")
+            "whatsapp": aposta.get("whatsapp", ""),
+            "jogos_realizados": jogos_realizados
         })
-    
+
     # Ordena: quem tem mais pontos fica no topo (🥇)
     return sorted(ranking, key=lambda x: x["pontos"], reverse=True)
 
@@ -320,6 +342,75 @@ async def sincronizar_manual():
     """Dispara a atualização de resultados imediatamente (em background)"""
     asyncio.create_task(sincronizar_resultados_processo_unico())
     return {"status": "Sincronização iniciada em segundo plano"}
+
+@app.get("/admin/relatorio-jogos", dependencies=[Depends(verificar_admin)])
+async def relatorio_jogos_admin(ultimos_dias: Optional[int] = None):
+    """Gera um relatório resumido dos jogos criados e das apostas por resultado."""
+    try:
+        jogos = supabase.table("jogos").select("*").order("datetime").execute().data
+        apostas = supabase.table("apostas").select("id, pago, palpites").execute().data
+
+        if ultimos_dias is not None:
+            if ultimos_dias <= 0:
+                raise HTTPException(status_code=400, detail="ultimos_dias deve ser maior que zero")
+
+            limite = datetime.now(timezone.utc) - timedelta(days=ultimos_dias)
+            jogos_filtrados = []
+            for jogo in jogos:
+                dt_raw = jogo.get("datetime")
+                if not dt_raw:
+                    continue
+                try:
+                    dt = datetime.fromisoformat(dt_raw.replace("Z", "+00:00"))
+                except Exception:
+                    continue
+                if dt >= limite:
+                    jogos_filtrados.append(jogo)
+            jogos = jogos_filtrados
+
+        total_apostas = len(apostas)
+        total_apostas_pagas = len([a for a in apostas if a.get("pago")])
+
+        relatorio_jogos = []
+        for jogo in jogos:
+            jogo_id = str(jogo.get("id"))
+            total_palpites = 0
+            contagem = {"home": 0, "draw": 0, "away": 0}
+
+            for aposta in apostas:
+                palpite = (aposta.get("palpites") or {}).get(jogo_id)
+                if palpite in contagem:
+                    contagem[palpite] += 1
+                    total_palpites += 1
+
+            relatorio_jogos.append({
+                "id": jogo.get("id"),
+                "home": jogo.get("home"),
+                "away": jogo.get("away"),
+                "championship": jogo.get("championship"),
+                "datetime": jogo.get("datetime"),
+                "active": jogo.get("active"),
+                "result": jogo.get("result"),
+                "total_palpites": total_palpites,
+                "palpites_home": contagem["home"],
+                "palpites_draw": contagem["draw"],
+                "palpites_away": contagem["away"]
+            })
+
+        return JSONResponse({
+            "gerado_em": datetime.now(timezone.utc).isoformat(),
+            "filtro": {"ultimos_dias": ultimos_dias},
+            "resumo": {
+                "total_jogos": len(jogos),
+                "total_apostas": total_apostas,
+                "total_apostas_pagas": total_apostas_pagas
+            },
+            "jogos": relatorio_jogos
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 async def sincronizar_resultados_processo_unico():
     """Versão da função de sync que corre apenas uma vez (sem loop infinito)"""
