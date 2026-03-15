@@ -91,6 +91,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 .rank-pts-label{font-size:.6rem;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:right}
 .rank-prize{font-family:'Barlow Condensed',sans-serif;font-size:.82rem;font-weight:600;margin-top:.15rem;text-align:right}
 .rank-1 .rank-prize{color:var(--gold)}.rank-2 .rank-prize{color:var(--silver)}.rank-3 .rank-prize{color:var(--bronze)}
+.rank-bets{margin-top:.45rem;font-size:.72rem;color:var(--muted);line-height:1.45}.rank-bets b{color:var(--text)}
 .result-game{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.3rem;margin-bottom:.65rem}
 .result-teams{display:grid;grid-template-columns:1fr auto 1fr;gap:.4rem;align-items:center;text-align:center}
 .result-score{font-family:'Bebas Neue',cursive;font-size:1.9rem;color:var(--gold);padding:.18rem .7rem;background:var(--bg3);border-radius:8px;min-width:80px}
@@ -303,10 +304,20 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 
       <div class="admin-panel">
         <div class="admin-section-title">📊 Resultados</div>
-        <button class="btn-primary" style="margin-bottom: 1rem; background: var(--blue)" onclick="syncManual()"></button>
+        <button class="btn-primary" style="margin-bottom: 1rem; background: var(--blue)" onclick="syncManual()">
             🔄 ATUALIZAR RESULTADOS AGORA (MANUAL)
         </button>
         <div id="admin-results-list"></div>
+      </div>
+
+      <div class="admin-panel">
+        <div class="admin-section-title">🧾 Relatório de Jogos</div>
+        <div class="info-box">Veja todos os jogos gerados no bolão com resumo de palpites e exporte o relatório em JSON para controle administrativo.</div>
+        <button class="btn-primary" style="margin-bottom:.5rem" onclick="gerarRelatorioJogos()">📄 GERAR RELATÓRIO (TODOS)</button>
+        <button class="btn-secondary" style="margin-bottom:1rem" onclick="gerarRelatorioJogos(7)">🗓️ ÚLTIMOS 7 DIAS</button>
+        <button class="btn-secondary" style="margin-bottom:1rem" onclick="downloadRelatorioJogos()">⬇️ BAIXAR JSON</button>
+        <div id="admin-report-summary" style="margin-bottom:.75rem;color:var(--muted);font-size:.82rem"></div>
+        <div id="admin-report-list"></div>
       </div>
 
       <div class="admin-panel">
@@ -406,6 +417,7 @@ let leagueFilter = 'all';
 let adminIn = false;
 let adminToken = "";
 let jogosNoBanco = [];
+let relatorioJogosAtual = null;
 
 // ════════════════════════════════ NAV ════════════════════════════════
 function goPage(name, btn) {
@@ -627,15 +639,23 @@ async function renderRanking() {
     const pm={0:S.prizes.first,1:S.prizes.second,2:S.prizes.third};
     const mm={0:'🥇',1:'🥈',2:'🥉'};
     
-    el.innerHTML = ranked.map((b,i)=>`
+    const lbl={home:'🏠 Casa',draw:'🤝 Empate',away:'✈️ Fora'};
+    el.innerHTML = ranked.map((b,i)=>{
+      const jogosFeitos = (b.jogos_realizados || []).map(j => `${j.home} × ${j.away}: <b>${lbl[j.palpite] || '—'}</b>`).join('<br>');
+      return `
       <div class="rank-item ${i<3?'rank-'+(i+1):''}">
         <div class="rank-pos">${i+1}</div>
-        <div><div class="rank-name">${b.nome}</div><div class="rank-hits">${b.pontos} acerto${b.pontos!==1?'s':''}</div></div>
+        <div>
+          <div class="rank-name">${b.nome}</div>
+          <div class="rank-hits">${b.pontos} acerto${b.pontos!==1?'s':''}</div>
+          <div class="rank-bets">${jogosFeitos || 'Nenhum jogo apostado.'}</div>
+        </div>
         <div>
           <div class="rank-points">${b.pontos}</div><div class="rank-pts-label">pontos</div>
           ${i<3?`<div class="rank-prize">${mm[i]} ${pm[i]}</div>`:''}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
       
   } catch (error) {
     console.error("Erro ao buscar ranking:", error);
@@ -962,11 +982,92 @@ async function carregarJogosDoBanco() {
     if (dados) {
         jogosNoBanco = dados; // 🎯 Atualiza a lista global
         renderGames(); // Desenha na tela
-        if(adminIn) renderAdminGames();
+        renderResults();
+        if(adminIn) {
+          renderAdminGames();
+          renderAdminResults();
+        }
     }
   } catch (error) {
     console.error("Erro ao carregar jogos:", error);
   }
+}
+
+async function gerarRelatorioJogos(ultimosDias = null) {
+  const summaryEl = document.getElementById('admin-report-summary');
+  const listEl = document.getElementById('admin-report-list');
+
+  summaryEl.textContent = 'Gerando relatório...';
+  listEl.innerHTML = '<div class="empty-state">Carregando relatório...</div>'
+
+  try {
+    const query = ultimosDias ? `?ultimos_dias=${ultimosDias}` : '';
+    const response = await fetch(`${BACKEND_URL}/admin/relatorio-jogos${query}`, {
+      headers: { 'x-admin-token': adminToken }
+    });
+
+    if (!response.ok) {
+      throw new Error('Falha ao gerar relatório');
+    }
+
+    relatorioJogosAtual = await response.json();
+    const resumo = relatorioJogosAtual.resumo || {};
+    const jogos = relatorioJogosAtual.jogos || [];
+
+    summaryEl.innerHTML = `📌 ${resumo.total_jogos || 0} jogo(s) • ${resumo.total_apostas || 0} aposta(s) • ${resumo.total_apostas_pagas || 0} paga(s)${ultimosDias ? ` • filtro: últimos ${ultimosDias} dias` : ''}`;
+
+    if (!jogos.length) {
+      listEl.innerHTML = '<div class="empty-state">Nenhum jogo encontrado para relatório.</div>';
+      return;
+    }
+
+    listEl.innerHTML = jogos.map((jogo, idx) => {
+      const dt = jogo.datetime
+        ? new Date(jogo.datetime).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+        : '—';
+      const resultado = jogo.result && jogo.result.home !== null && jogo.result.away !== null && jogo.result.home !== ''
+        ? `${jogo.result.home} × ${jogo.result.away}`
+        : 'Pendente';
+      return `
+        <div class="rank-item" style="margin-bottom:.5rem">
+          <div>
+            <div class="rank-name">${idx + 1}. ${jogo.home} × ${jogo.away}</div>
+            <div class="rank-hits">${jogo.championship || 'Sem campeonato'} • ${dt}</div>
+            <div class="rank-hits">Resultado: ${resultado}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="rank-points">${jogo.total_palpites || 0}</div>
+            <div class="rank-pts-label">palpite(s)</div>
+            <div class="rank-hits">🏠 ${jogo.palpites_home || 0} • 🤝 ${jogo.palpites_draw || 0} • ✈️ ${jogo.palpites_away || 0}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    toast('Relatório gerado com sucesso!');
+  } catch (error) {
+    console.error(error);
+    summaryEl.textContent = '';
+    listEl.innerHTML = '<div class="empty-state">Erro ao gerar relatório.</div>';
+    toast('Erro ao gerar relatório.', true);
+  }
+}
+
+function downloadRelatorioJogos() {
+  if (!relatorioJogosAtual) {
+    toast('Gere o relatório antes de baixar.', true);
+    return;
+  }
+
+  const blob = new Blob([JSON.stringify(relatorioJogosAtual, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.href = url;
+  a.download = `relatorio-jogos-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ════════════════════════════════ UTILS ════════════════════════════════
@@ -989,11 +1090,21 @@ async function carregarApostasAdmin() {
     return;
   }
 
-  el.innerHTML = apostas.map(a => `
-    <div class="rank-item" style="margin-bottom:.5rem; grid-template-columns: 1fr auto auto;">
+  el.innerHTML = apostas.map(a => {
+    const palpites = a.palpites || {};
+    const jogosFeitos = Object.entries(palpites).map(([jid, palpite]) => {
+      const jogo = jogosNoBanco.find(g => String(g.id) === String(jid));
+      const lbl = { home: 'Casa', draw: 'Empate', away: 'Fora' };
+      if (!jogo) return `• Jogo #${jid}: ${lbl[palpite] || '—'}`;
+      return `• ${jogo.home} × ${jogo.away}: ${lbl[palpite] || '—'}`;
+    });
+
+    return `
+    <div class="rank-item" style="margin-bottom:.5rem; grid-template-columns: 1fr auto; gap:.8rem;">
       <div>
         <div class="rank-name">${a.nome}</div>
         <div class="rank-hits" style="font-size:.7rem">${a.whatsapp}</div>
+        <div class="rank-hits" style="margin-top:.35rem;white-space:pre-line">${jogosFeitos.length ? jogosFeitos.join('<br>') : 'Sem palpites registrados.'}</div>
       </div>
       <div style="text-align:right">
         <button class="toggle-btn ${a.pago ? 'on' : ''}" onclick="togglePagamento('${a.id}', ${!a.pago})">
@@ -1001,7 +1112,8 @@ async function carregarApostasAdmin() {
         </button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 async function togglePagamento(id, novoStatus) {
