@@ -345,19 +345,18 @@ async def sincronizar_manual():
 
 @app.get("/admin/relatorio-jogos", dependencies=[Depends(verificar_admin)])
 async def relatorio_jogos_admin(ultimos_dias: Optional[int] = None):
-    """Gera um relatório resumido dos jogos criados e das apostas por resultado."""
+    """Gera um relatório de apostas separadas por dia para uso administrativo."""
     try:
-        jogos = supabase.table("jogos").select("*").order("datetime").execute().data
-        apostas = supabase.table("apostas").select("id, pago, palpites").execute().data
+        apostas = supabase.table("apostas").select("id, nome, whatsapp, pago, palpites, created_at").order("created_at", desc=True).execute().data
 
         if ultimos_dias is not None:
             if ultimos_dias <= 0:
                 raise HTTPException(status_code=400, detail="ultimos_dias deve ser maior que zero")
 
             limite = datetime.now(timezone.utc) - timedelta(days=ultimos_dias)
-            jogos_filtrados = []
-            for jogo in jogos:
-                dt_raw = jogo.get("datetime")
+            apostas_filtradas = []
+            for aposta in apostas:
+                dt_raw = aposta.get("created_at")
                 if not dt_raw:
                     continue
                 try:
@@ -365,47 +364,21 @@ async def relatorio_jogos_admin(ultimos_dias: Optional[int] = None):
                 except Exception:
                     continue
                 if dt >= limite:
-                    jogos_filtrados.append(jogo)
-            jogos = jogos_filtrados
+                    apostas_filtradas.append(aposta)
+            apostas = apostas_filtradas
 
         total_apostas = len(apostas)
         total_apostas_pagas = len([a for a in apostas if a.get("pago")])
-
-        relatorio_jogos = []
-        for jogo in jogos:
-            jogo_id = str(jogo.get("id"))
-            total_palpites = 0
-            contagem = {"home": 0, "draw": 0, "away": 0}
-
-            for aposta in apostas:
-                palpite = (aposta.get("palpites") or {}).get(jogo_id)
-                if palpite in contagem:
-                    contagem[palpite] += 1
-                    total_palpites += 1
-
-            relatorio_jogos.append({
-                "id": jogo.get("id"),
-                "home": jogo.get("home"),
-                "away": jogo.get("away"),
-                "championship": jogo.get("championship"),
-                "datetime": jogo.get("datetime"),
-                "active": jogo.get("active"),
-                "result": jogo.get("result"),
-                "total_palpites": total_palpites,
-                "palpites_home": contagem["home"],
-                "palpites_draw": contagem["draw"],
-                "palpites_away": contagem["away"]
-            })
 
         return JSONResponse({
             "gerado_em": datetime.now(timezone.utc).isoformat(),
             "filtro": {"ultimos_dias": ultimos_dias},
             "resumo": {
-                "total_jogos": len(jogos),
                 "total_apostas": total_apostas,
-                "total_apostas_pagas": total_apostas_pagas
+                "total_apostas_pagas": total_apostas_pagas,
+                "total_apostas_pendentes": total_apostas - total_apostas_pagas
             },
-            "jogos": relatorio_jogos
+            "apostas": apostas
         })
     except HTTPException:
         raise
