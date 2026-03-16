@@ -4,11 +4,13 @@ from typing import Dict, List, Optional
 from datetime import datetime, timezone, timedelta
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import os
 from supabase import create_client, Client
 import asyncio
+from io import BytesIO
 
 
 app = FastAPI()
@@ -343,11 +345,99 @@ async def sincronizar_manual():
     asyncio.create_task(sincronizar_resultados_processo_unico())
     return {"status": "Sincronização iniciada em segundo plano"}
 
+def _escape_pdf_text(texto: str) -> str:
+    return (texto or "").replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _gerar_relatorio_pdf(relatorio):
+    linhas = [
+        "Relatorio de Apostas - BolaoPRO",
+        f"Gerado em: {relatorio.get('gerado_em', '')}",
+    ]
+
+    resumo = relatorio.get("resumo", {})
+    linhas.append(
+        f"Resumo: {resumo.get('total_apostas', 0)} apostas | {resumo.get('total_apostas_pagas', 0)} pagas | {resumo.get('total_apostas_pendentes', 0)} pendentes"
+    )
+    linhas.append("")
+
+    for aposta in relatorio.get("apostas", []):
+        nome = aposta.get("nome", "Anonimo")
+        pago = "PAGO" if aposta.get("pago") else "PENDENTE"
+        linhas.append(f"{nome} - {pago}")
+        linhas.append(f"WhatsApp: {aposta.get('whatsapp', 'Sem WhatsApp')} | Data: {aposta.get('created_at', 'Sem data')}")
+
+        palpites = aposta.get("palpites_legiveis") or []
+        if not palpites:
+            linhas.append("- Sem palpites registrados")
+        else:
+            for p in palpites:
+                linhas.append(f"- {p}")
+        linhas.append("")
+
+    max_linhas_por_pagina = 46
+    paginas = [linhas[i:i + max_linhas_por_pagina] for i in range(0, len(linhas), max_linhas_por_pagina)] or [[]]
+
+    objetos = []
+
+    # 1. Catalogo
+    objetos.append('<< /Type /Catalog /Pages 2 0 R >>')
+
+    # 2. Pages (kids montado depois)
+    kids = []
+
+    # 3. Fonte Helvetica
+    objetos.append('<< /Type /Pages /Kids [] /Count 0 >>')
+    objetos.append('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
+
+    next_obj = 5
+    for pagina in paginas:
+        content_lines = ["BT", "/F1 10 Tf", "50 800 Td", "14 TL"]
+        primeiro = True
+        for linha in pagina:
+            safe = _escape_pdf_text(linha)
+            if primeiro:
+                content_lines.append(f"({safe}) Tj")
+                primeiro = False
+            else:
+                content_lines.append(f"T* ({safe}) Tj")
+        content_lines.append("ET")
+        conteudo = "\n".join(content_lines)
+
+        stream_obj_id = next_obj
+        next_obj += 1
+        page_obj_id = next_obj
+        next_obj += 1
+
+        objetos.append(f'<< /Length {len(conteudo.encode("latin-1", errors="replace"))} >>\nstream\n{conteudo}\nendstream')
+        objetos.append(f'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents {stream_obj_id} 0 R >>')
+        kids.append(f"{page_obj_id} 0 R")
+
+    objetos[1] = f'<< /Type /Pages /Kids [{" ".join(kids)}] /Count {len(kids)} >>'
+
+    pdf = '%PDF-1.4\n'
+    offsets = [0]
+    for i, obj in enumerate(objetos, start=1):
+        offsets.append(len(pdf.encode('latin-1', errors='replace')))
+        pdf += f"{i} 0 obj\n{obj}\nendobj\n"
+
+    xref_pos = len(pdf.encode('latin-1', errors='replace'))
+    pdf += f"xref\n0 {len(objetos)+1}\n"
+    pdf += "0000000000 65535 f \n"
+    for off in offsets[1:]:
+        pdf += f"{off:010d} 00000 n \n"
+
+    pdf += f"trailer\n<< /Size {len(objetos)+1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF"
+    return BytesIO(pdf.encode('latin-1', errors='replace'))
+
+
 @app.get("/admin/relatorio-jogos", dependencies=[Depends(verificar_admin)])
 async def relatorio_jogos_admin(ultimos_dias: Optional[int] = None):
     """Gera um relatório de apostas separadas por dia para uso administrativo."""
     try:
         apostas = supabase.table("apostas").select("id, nome, whatsapp, pago, palpites, created_at").order("created_at", desc=True).execute().data
+        jogos = supabase.table("jogos").select("id, home, away").execute().data
+        jogos_map = {str(j.get("id")): j for j in jogos}
 
         if ultimos_dias is not None:
             if ultimos_dias <= 0:
@@ -367,6 +457,18 @@ async def relatorio_jogos_admin(ultimos_dias: Optional[int] = None):
                     apostas_filtradas.append(aposta)
             apostas = apostas_filtradas
 
+        for aposta in apostas:
+            palpites = aposta.get("palpites") or {}
+            legiveis = []
+            for jogo_id, palpite in palpites.items():
+                jogo = jogos_map.get(str(jogo_id))
+                palpite_txt = {"home": "Casa", "draw": "Empate", "away": "Fora"}.get(palpite, "—")
+                if jogo:
+                    legiveis.append(f"{jogo.get('home')} x {jogo.get('away')}: {palpite_txt}")
+                else:
+                    legiveis.append(f"Jogo #{jogo_id}: {palpite_txt}")
+            aposta["palpites_legiveis"] = legiveis
+
         total_apostas = len(apostas)
         total_apostas_pagas = len([a for a in apostas if a.get("pago")])
 
@@ -384,6 +486,28 @@ async def relatorio_jogos_admin(ultimos_dias: Optional[int] = None):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/relatorio-jogos-pdf", dependencies=[Depends(verificar_admin)])
+async def relatorio_jogos_pdf(ultimos_dias: Optional[int] = None, somente_dia: bool = False):
+    """Exporta relatório administrativo em PDF (todos ou apenas jogos do dia)."""
+    if somente_dia:
+        ultimos_dias = 1
+
+    relatorio_response = await relatorio_jogos_admin(ultimos_dias=ultimos_dias)
+    relatorio = relatorio_response.body
+    import json
+    relatorio_data = json.loads(relatorio)
+
+    pdf_buffer = _gerar_relatorio_pdf(relatorio_data)
+    stamp = datetime.now().strftime("%Y-%m-%d-%H-%M")
+    nome_arquivo = f"relatorio-jogos-{('dia' if somente_dia else 'completo')}-{stamp}.pdf"
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={nome_arquivo}"}
+    )
+
 
 async def sincronizar_resultados_processo_unico():
     """Versão da função de sync que corre apenas uma vez (sem loop infinito)"""
