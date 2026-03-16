@@ -149,6 +149,16 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 .info-box{background:rgba(0,230,118,.05);border:1px solid rgba(0,230,118,.2);border-radius:10px;padding:.85rem;margin-bottom:.85rem;font-size:.82rem;color:var(--muted);line-height:1.6}
 .info-box a{color:var(--green);text-decoration:none}
 .info-box a:hover{text-decoration:underline}
+.report-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:1rem}
+.report-actions .btn-secondary,.report-actions .btn-primary{margin:0}
+.pagination-wrap{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+.pagination-status{font-size:.78rem;color:var(--muted)}
+.pagination-buttons{display:flex;gap:.4rem}
+.pagination-btn{padding:.45rem .75rem;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:.76rem;letter-spacing:1px;text-transform:uppercase}
+.pagination-btn:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:600px){
+  .report-actions{grid-template-columns:1fr}
+}
 @media(max-width:600px){
   .admin-game-row{grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto;gap:.35rem}
   .admin-game-row.header{display:none}
@@ -251,6 +261,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
         <div id="admin-bets-list" class="ranking-list">
           <div class="empty-state">Buscando apostas...</div>
         </div>
+        <div class="pagination-wrap" id="admin-bets-pagination" style="display:none">
+          <div class="pagination-status" id="admin-bets-page-info"></div>
+          <div class="pagination-buttons">
+            <button class="pagination-btn" id="admin-bets-prev" onclick="mudarPaginaApostas(-1)">◀ ANTERIOR</button>
+            <button class="pagination-btn" id="admin-bets-next" onclick="mudarPaginaApostas(1)">PRÓXIMA ▶</button>
+          </div>
+        </div>
       </div>
 
         <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:flex-end">
@@ -313,9 +330,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
       <div class="admin-panel">
         <div class="admin-section-title">🧾 Relatório de Apostas</div>
         <div class="info-box">Veja as apostas feitas pelos apostadores, separadas por dia, e exporte o relatório em JSON para controle administrativo.</div>
-        <button class="btn-primary" style="margin-bottom:.5rem" onclick="gerarRelatorioJogos()">📄 GERAR RELATÓRIO (TODOS)</button>
-        <button class="btn-secondary" style="margin-bottom:1rem" onclick="gerarRelatorioJogos(7)">🗓️ ÚLTIMOS 7 DIAS</button>
-        <button class="btn-secondary" style="margin-bottom:1rem" onclick="downloadRelatorioJogos()">⬇️ BAIXAR JSON</button>
+        <div class="report-actions">
+          <button class="btn-primary" onclick="gerarRelatorioJogos()">📄 GERAR RELATÓRIO (TODOS)</button>
+          <button class="btn-secondary" onclick="gerarRelatorioJogos(7)">🗓️ ÚLTIMOS 7 DIAS</button>
+          <button class="btn-secondary" onclick="downloadRelatorioJogos()">⬇️ BAIXAR JSON</button>
+          <button class="btn-secondary" onclick="baixarRelatorioPDF(false)">📕 BAIXAR PDF (TOTAL)</button>
+          <button class="btn-secondary" onclick="baixarRelatorioPDF(true)">📗 PDF SÓ JOGOS DO DIA</button>
+        </div>
         <div id="admin-report-summary" style="margin-bottom:.75rem;color:var(--muted);font-size:.82rem"></div>
         <div id="admin-report-list"></div>
       </div>
@@ -418,6 +439,9 @@ let adminIn = false;
 let adminToken = "";
 let jogosNoBanco = [];
 let relatorioJogosAtual = null;
+let adminApostas = [];
+let paginaApostasAtual = 1;
+const APOSTAS_POR_PAGINA = 6;
 
 function agruparItensPorDia(itens = [], campoData = 'created_at') {
   const grupos = {};
@@ -1117,6 +1141,35 @@ function downloadRelatorioJogos() {
   URL.revokeObjectURL(url);
 }
 
+
+async function baixarRelatorioPDF(somenteDia = false) {
+  try {
+    const query = somenteDia ? '?somente_dia=true' : '';
+    const response = await fetch(`${BACKEND_URL}/admin/relatorio-jogos-pdf${query}`, {
+      headers: { 'x-admin-token': adminToken }
+    });
+
+    if (!response.ok) {
+      throw new Error('Falha ao gerar PDF');
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.href = url;
+    a.download = `relatorio-jogos-${somenteDia ? 'dia' : 'completo'}-${stamp}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast(somenteDia ? 'PDF do dia baixado!' : 'PDF completo baixado!');
+  } catch (error) {
+    console.error(error);
+    toast('Erro ao baixar PDF.', true);
+  }
+}
+
 // ════════════════════════════════ UTILS ════════════════════════════════
 function toast(msg, isErr=false) {
   const t=document.getElementById('toast');
@@ -1125,25 +1178,52 @@ function toast(msg, isErr=false) {
   setTimeout(()=>t.classList.remove('show'),2800);
 }
 
-async function carregarApostasAdmin() {
-  const response = await fetch(`${BACKEND_URL}/admin/apostas`, {
-    headers: { 'x-admin-token': adminToken }
-  });
-  const apostas = await response.json();
+function renderPaginacaoApostas() {
   const el = document.getElementById('admin-bets-list');
+  const pagWrap = document.getElementById('admin-bets-pagination');
+  const info = document.getElementById('admin-bets-page-info');
+  const prev = document.getElementById('admin-bets-prev');
+  const next = document.getElementById('admin-bets-next');
 
-  if (!apostas.length) {
+  if (!adminApostas.length) {
+    pagWrap.style.display = 'none';
     el.innerHTML = '<p style="color:var(--muted);padding:1rem">Nenhuma aposta feita ainda.</p>';
     return;
   }
 
-  const gruposPorDia = agruparItensPorDia(apostas, 'created_at');
+  const totalPaginas = Math.max(1, Math.ceil(adminApostas.length / APOSTAS_POR_PAGINA));
+  paginaApostasAtual = Math.min(Math.max(1, paginaApostasAtual), totalPaginas);
+
+  const inicio = (paginaApostasAtual - 1) * APOSTAS_POR_PAGINA;
+  const fim = inicio + APOSTAS_POR_PAGINA;
+  const paginaItens = adminApostas.slice(inicio, fim);
+  const gruposPorDia = agruparItensPorDia(paginaItens, 'created_at');
+
   el.innerHTML = gruposPorDia.map(([dia, lista]) => `
     <div style="margin-bottom:.8rem">
       <div class="rank-name" style="margin-bottom:.35rem">📅 ${dia}</div>
       ${lista.map(aposta => renderItemAposta(aposta, true)).join('')}
     </div>
   `).join('');
+
+  pagWrap.style.display = totalPaginas > 1 ? 'flex' : 'none';
+  info.textContent = `Página ${paginaApostasAtual} de ${totalPaginas} • ${adminApostas.length} aposta(s)`;
+  prev.disabled = paginaApostasAtual === 1;
+  next.disabled = paginaApostasAtual === totalPaginas;
+}
+
+function mudarPaginaApostas(delta) {
+  paginaApostasAtual += delta;
+  renderPaginacaoApostas();
+}
+
+async function carregarApostasAdmin() {
+  const response = await fetch(`${BACKEND_URL}/admin/apostas`, {
+    headers: { 'x-admin-token': adminToken }
+  });
+  adminApostas = await response.json();
+  paginaApostasAtual = 1;
+  renderPaginacaoApostas();
 }
 
 async function togglePagamento(id, novoStatus) {
