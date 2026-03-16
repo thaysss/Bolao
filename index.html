@@ -311,8 +311,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
       </div>
 
       <div class="admin-panel">
-        <div class="admin-section-title">🧾 Relatório de Jogos</div>
-        <div class="info-box">Veja todos os jogos gerados no bolão com resumo de palpites e exporte o relatório em JSON para controle administrativo.</div>
+        <div class="admin-section-title">🧾 Relatório de Apostas</div>
+        <div class="info-box">Veja as apostas feitas pelos apostadores, separadas por dia, e exporte o relatório em JSON para controle administrativo.</div>
         <button class="btn-primary" style="margin-bottom:.5rem" onclick="gerarRelatorioJogos()">📄 GERAR RELATÓRIO (TODOS)</button>
         <button class="btn-secondary" style="margin-bottom:1rem" onclick="gerarRelatorioJogos(7)">🗓️ ÚLTIMOS 7 DIAS</button>
         <button class="btn-secondary" style="margin-bottom:1rem" onclick="downloadRelatorioJogos()">⬇️ BAIXAR JSON</button>
@@ -418,6 +418,67 @@ let adminIn = false;
 let adminToken = "";
 let jogosNoBanco = [];
 let relatorioJogosAtual = null;
+
+function agruparItensPorDia(itens = [], campoData = 'created_at') {
+  const grupos = {};
+
+  for (const item of itens) {
+    const raw = item?.[campoData];
+    let chave = 'Sem data';
+
+    if (raw) {
+      const dt = new Date(raw);
+      if (!Number.isNaN(dt.getTime())) {
+        chave = dt.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+      }
+    }
+
+    if (!grupos[chave]) {
+      grupos[chave] = [];
+    }
+    grupos[chave].push(item);
+  }
+
+  return Object.entries(grupos).sort(([a], [b]) => {
+    if (a === 'Sem data') return 1;
+    if (b === 'Sem data') return -1;
+    const [da, ma, aa] = a.split('/').map(Number);
+    const [db, mb, ab] = b.split('/').map(Number);
+    return new Date(ab, mb - 1, db) - new Date(aa, ma - 1, da);
+  });
+}
+
+function renderItemAposta(a, mostrarBotaoPagamento = false) {
+  const palpites = a.palpites || {};
+  const jogosFeitos = Object.entries(palpites).map(([jid, palpite]) => {
+    const jogo = jogosNoBanco.find(g => String(g.id) === String(jid));
+    const lbl = { home: 'Casa', draw: 'Empate', away: 'Fora' };
+    if (!jogo) return `• Jogo #${jid}: ${lbl[palpite] || '—'}`;
+    return `• ${jogo.home} × ${jogo.away}: ${lbl[palpite] || '—'}`;
+  });
+
+  const dataAposta = a.created_at
+    ? new Date(a.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+    : 'Data não informada';
+
+  return `
+    <div class="rank-item" style="margin-bottom:.5rem; grid-template-columns: 1fr auto; gap:.8rem;">
+      <div>
+        <div class="rank-name">${a.nome || 'Anônimo'}</div>
+        <div class="rank-hits" style="font-size:.7rem">${a.whatsapp || 'Sem WhatsApp'} • ${dataAposta}</div>
+        <div class="rank-hits" style="margin-top:.35rem;white-space:pre-line">${jogosFeitos.length ? jogosFeitos.join('<br>') : 'Sem palpites registrados.'}</div>
+      </div>
+      <div style="text-align:right">
+        ${mostrarBotaoPagamento ? `<button class="toggle-btn ${a.pago ? 'on' : ''}" onclick="togglePagamento('${a.id}', ${!a.pago})">${a.pago ? '✅ PAGO' : '⏳ PENDENTE'}</button>` : `<div class="rank-hits">${a.pago ? '✅ Pago' : '⏳ Pendente'}</div>`}
+      </div>
+    </div>
+  `;
+}
+
 
 // ════════════════════════════════ NAV ════════════════════════════════
 function goPage(name, btn) {
@@ -1012,36 +1073,22 @@ async function gerarRelatorioJogos(ultimosDias = null) {
 
     relatorioJogosAtual = await response.json();
     const resumo = relatorioJogosAtual.resumo || {};
-    const jogos = relatorioJogosAtual.jogos || [];
+    const apostas = relatorioJogosAtual.apostas || [];
+    const gruposPorDia = agruparItensPorDia(apostas, 'created_at');
 
-    summaryEl.innerHTML = `📌 ${resumo.total_jogos || 0} jogo(s) • ${resumo.total_apostas || 0} aposta(s) • ${resumo.total_apostas_pagas || 0} paga(s)${ultimosDias ? ` • filtro: últimos ${ultimosDias} dias` : ''}`;
+    summaryEl.innerHTML = `📌 ${resumo.total_apostas || 0} aposta(s) • ${resumo.total_apostas_pagas || 0} paga(s) • ${resumo.total_apostas_pendentes || 0} pendente(s)${ultimosDias ? ` • filtro: últimos ${ultimosDias} dias` : ''}`;
 
-    if (!jogos.length) {
-      listEl.innerHTML = '<div class="empty-state">Nenhum jogo encontrado para relatório.</div>';
+    if (!apostas.length) {
+      listEl.innerHTML = '<div class="empty-state">Nenhuma aposta encontrada para relatório.</div>';
       return;
     }
 
-    listEl.innerHTML = jogos.map((jogo, idx) => {
-      const dt = jogo.datetime
-        ? new Date(jogo.datetime).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
-        : '—';
-      const resultado = jogo.result && jogo.result.home !== null && jogo.result.away !== null && jogo.result.home !== ''
-        ? `${jogo.result.home} × ${jogo.result.away}`
-        : 'Pendente';
-      return `
-        <div class="rank-item" style="margin-bottom:.5rem">
-          <div>
-            <div class="rank-name">${idx + 1}. ${jogo.home} × ${jogo.away}</div>
-            <div class="rank-hits">${jogo.championship || 'Sem campeonato'} • ${dt}</div>
-            <div class="rank-hits">Resultado: ${resultado}</div>
-          </div>
-          <div style="text-align:right">
-            <div class="rank-points">${jogo.total_palpites || 0}</div>
-            <div class="rank-pts-label">palpite(s)</div>
-            <div class="rank-hits">🏠 ${jogo.palpites_home || 0} • 🤝 ${jogo.palpites_draw || 0} • ✈️ ${jogo.palpites_away || 0}</div>
-          </div>
-        </div>`;
-    }).join('');
+    listEl.innerHTML = gruposPorDia.map(([dia, lista]) => `
+      <div style="margin-bottom:.8rem">
+        <div class="rank-name" style="margin-bottom:.35rem">📅 ${dia}</div>
+        ${lista.map(aposta => renderItemAposta(aposta)).join('')}
+      </div>
+    `).join('');
 
     toast('Relatório gerado com sucesso!');
   } catch (error) {
@@ -1084,36 +1131,19 @@ async function carregarApostasAdmin() {
   });
   const apostas = await response.json();
   const el = document.getElementById('admin-bets-list');
-  
+
   if (!apostas.length) {
     el.innerHTML = '<p style="color:var(--muted);padding:1rem">Nenhuma aposta feita ainda.</p>';
     return;
   }
 
-  el.innerHTML = apostas.map(a => {
-    const palpites = a.palpites || {};
-    const jogosFeitos = Object.entries(palpites).map(([jid, palpite]) => {
-      const jogo = jogosNoBanco.find(g => String(g.id) === String(jid));
-      const lbl = { home: 'Casa', draw: 'Empate', away: 'Fora' };
-      if (!jogo) return `• Jogo #${jid}: ${lbl[palpite] || '—'}`;
-      return `• ${jogo.home} × ${jogo.away}: ${lbl[palpite] || '—'}`;
-    });
-
-    return `
-    <div class="rank-item" style="margin-bottom:.5rem; grid-template-columns: 1fr auto; gap:.8rem;">
-      <div>
-        <div class="rank-name">${a.nome}</div>
-        <div class="rank-hits" style="font-size:.7rem">${a.whatsapp}</div>
-        <div class="rank-hits" style="margin-top:.35rem;white-space:pre-line">${jogosFeitos.length ? jogosFeitos.join('<br>') : 'Sem palpites registrados.'}</div>
-      </div>
-      <div style="text-align:right">
-        <button class="toggle-btn ${a.pago ? 'on' : ''}" onclick="togglePagamento('${a.id}', ${!a.pago})">
-          ${a.pago ? '✅ PAGO' : '⏳ PENDENTE'}
-        </button>
-      </div>
+  const gruposPorDia = agruparItensPorDia(apostas, 'created_at');
+  el.innerHTML = gruposPorDia.map(([dia, lista]) => `
+    <div style="margin-bottom:.8rem">
+      <div class="rank-name" style="margin-bottom:.35rem">📅 ${dia}</div>
+      ${lista.map(aposta => renderItemAposta(aposta, true)).join('')}
     </div>
-  `;
-  }).join('');
+  `).join('');
 }
 
 async function togglePagamento(id, novoStatus) {
